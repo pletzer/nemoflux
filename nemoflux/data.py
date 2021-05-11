@@ -22,12 +22,12 @@ class Data(object):
     self.u = vU[:]
     self.v = vV[:]
 
-    def getFaceIntegratedData(self, fileName):
-        """Dump the grid data to a VTK file
+    def getFaceIntegratedData(self, grid):
+        """Compute the area integrals of the velocity field on each cell face
 
-        :param fileName: file name
+        :param grid: instance of Grid
         """
-        self.grid.dump(fileName)
+        pass
 
 
 
