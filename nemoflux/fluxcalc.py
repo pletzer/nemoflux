@@ -35,6 +35,13 @@ class FluxCalc(object):
                 x2, y2, _ = self.gr.getPoint(k, 2)
                 x3, y3, _ = self.gr.getPoint(k, 3)
 
+                # NEED TO USE ds IN METRES (TO CHANGE)
+
+                # south
+                ds = numpy.sqrt((x1 - x0)**2 + (y1 - y0)**2)
+                if j >= 1:
+                    self.integratedVelocity[k, 0] = vo[j - 1, i] * ds
+
                 # east
                 ds = numpy.sqrt((x2 - x1)**2 + (y2 - y1)**2)
                 self.integratedVelocity[k, 1] = uo[j, i] * ds
@@ -42,6 +49,10 @@ class FluxCalc(object):
                 # north
                 ds = numpy.sqrt((x3 - x2)**2 + (y3 - y2)**2)
                 self.integratedVelocity[k, 2] = vo[j, i] * ds
+
+                # west, periodic boundary
+                ds = numpy.sqrt((x3 - x0)**2 + (y3 - y0)**2)
+                self.integratedVelocity[k, 3] = uo[j, i - 1] * ds
 
                 k += 1
 

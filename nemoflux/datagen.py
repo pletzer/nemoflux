@@ -2,7 +2,8 @@ import netCDF4
 import numpy
 import defopt
 
-REAL = 'float64'
+# precision with which data will be saved in the netCDF file
+REAL = 'float32'
 
 class LatLonDataGen(object):
 
@@ -56,6 +57,8 @@ class LatLonDataGen(object):
 
                 self.nav_lat[j, i] = ym
                 self.nav_lon[j, i] = xm
+
+                # NEED TO USE DISTANCE IN METRES (TO CHANGE)
 
                 # east side of the cell
                 x, y = x1, y1
