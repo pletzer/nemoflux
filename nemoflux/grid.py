@@ -29,6 +29,15 @@ class Grid(object):
         self.grid = mint.Grid()
         self.grid.setPoints(self.points)
 
+    def getMintGrid(self):
+        return self.grid
+
+    def getNumCells(self):
+        return self.points.shape[0]
+
+    def getPoint(self, k, vertex):
+        return self.points[k, vertex, :]
+
     def dump(self, fileName):
         """Dump the grid data to a VTK file
 

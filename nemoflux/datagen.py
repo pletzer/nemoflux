@@ -60,14 +60,14 @@ class LatLonDataGen(object):
                 phi1 = eval(potentialFunction)
                 x, y = x1, y0
                 phi0 = eval(potentialFunction)
-                self.u[j, i] = phi1 - phi0
+                self.u[j, i] = (phi1 - phi0) / (y1 - y0)
 
                 # north side of the cell
                 x, y = x1, y1
                 phi1 = eval(potentialFunction)
                 x, y = x0, y1
                 phi0 = eval(potentialFunction)
-                self.v[j, i] = phi1 - phi0
+                self.v[j, i] = (phi1 - phi0) / (x1 - x0)
 
 
     def save(self):
