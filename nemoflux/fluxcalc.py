@@ -45,8 +45,6 @@ class FluxCalc(object):
 
                 k += 1
 
-
-
     def getFlux(self):
         return self.pli.getIntegral(self.integratedVelocity)
 

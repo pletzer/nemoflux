@@ -2,6 +2,8 @@ import netCDF4
 import numpy
 import defopt
 
+REAL = 'float64'
+
 class LatLonDataGen(object):
 
     def __init__(self, prefix=''):
@@ -23,15 +25,15 @@ class LatLonDataGen(object):
 
     def build(self, potentialFunction):
 
-        self.u = numpy.zeros((self.ny, self.nx), numpy.float32)
-        self.v = numpy.zeros((self.ny, self.nx), numpy.float32)
+        self.u = numpy.zeros((self.ny, self.nx), REAL)
+        self.v = numpy.zeros((self.ny, self.nx), REAL)
 
         ny1, nx1 = self.ny + 1, self.nx + 1
         dy, dx = (self.ymax - self.ymin)/float(self.ny), (self.xmax - self.xmin)/float(self.nx)
-        self.nav_lat = numpy.zeros((self.ny, self.nx), numpy.float32)
-        self.nav_lon = numpy.zeros((self.ny, self.nx), numpy.float32)
-        self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), numpy.float32)
-        self.bounds_lon = numpy.zeros((self.ny, self.nx, 4), numpy.float32)
+        self.nav_lat = numpy.zeros((self.ny, self.nx), REAL)
+        self.nav_lon = numpy.zeros((self.ny, self.nx), REAL)
+        self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), REAL)
+        self.bounds_lon = numpy.zeros((self.ny, self.nx, 4), REAL)
         # iterate over cells
         for j in range(self.ny):
             y0 = self.ymin + j*dy
@@ -77,20 +79,20 @@ class LatLonDataGen(object):
         ncT.createDimension('x', self.nx)
         ncT.createDimension('nvertex', 4)
 
-        nav_lat = ncT.createVariable('nav_lat', 'float32', ('y', 'x'))
+        nav_lat = ncT.createVariable('nav_lat', REAL, ('y', 'x'))
         nav_lat.standard_name = 'latitude'
         nav_lat.bounds = 'bounds_lat'
         nav_lat[:] = self.nav_lat
 
-        nav_lon = ncT.createVariable('nv_lon', 'float32', ('y', 'x'))
+        nav_lon = ncT.createVariable('nv_lon', REAL, ('y', 'x'))
         nav_lon.standard_name = 'longitude'
         nav_lon.bounds = 'bounds_lon'
         nav_lon[:] = self.nav_lon
 
-        bounds_lat = ncT.createVariable('bounds_lat', 'float32', ('y', 'x', 'nvertex'))
+        bounds_lat = ncT.createVariable('bounds_lat', REAL, ('y', 'x', 'nvertex'))
         bounds_lat[:] = self.bounds_lat
 
-        bounds_lon = ncT.createVariable('bounds_lon', 'float32', ('y', 'x', 'nvertex'))
+        bounds_lon = ncT.createVariable('bounds_lon', REAL, ('y', 'x', 'nvertex'))
         bounds_lon[:] = self.bounds_lon
 
         ncT.close()
@@ -98,7 +100,7 @@ class LatLonDataGen(object):
         ncU = netCDF4.Dataset(self.prefix + '_U.nc', 'w')
         ncU.createDimension('y', self.ny)
         ncU.createDimension('x', self.nx)
-        uo = ncU.createVariable('uo', 'float32', ('y', 'x'))
+        uo = ncU.createVariable('uo', REAL, ('y', 'x'))
         uo.standard_name = 'sea_water_x_velocity'
         uo.units = 'm/s'
         uo[:] = self.u
@@ -107,7 +109,7 @@ class LatLonDataGen(object):
         ncV = netCDF4.Dataset(self.prefix + '_V.nc', 'w')
         ncV.createDimension('y', self.ny)
         ncV.createDimension('x', self.nx)
-        vo = ncV.createVariable('vo', 'float32', ('y', 'x'))
+        vo = ncV.createVariable('vo', REAL, ('y', 'x'))
         vo.standard_name = 'sea_water_y_velocity'
         vo.units = 'm/s'
         vo[:] = self.v
