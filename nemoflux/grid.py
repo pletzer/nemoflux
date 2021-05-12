@@ -24,7 +24,7 @@ class Grid(object):
                 for vertex in range(4):
                     x, y = bounds_lon[j, i, vertex], bounds_lat[j, i, vertex]
                     self.points[k, vertex, :] = x, y, 0.0
-            k += 1
+                k += 1
 
         self.grid = mint.Grid()
         self.grid.setPoints(self.points)

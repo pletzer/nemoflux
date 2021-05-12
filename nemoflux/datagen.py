@@ -53,7 +53,7 @@ class LatLonDataGen(object):
                 self.bounds_lon[j, i, 3] = x0
 
                 self.nav_lat[j, i] = ym
-                self.nav_lat[j, i] = xm
+                self.nav_lon[j, i] = xm
 
                 # east side of the cell
                 x, y = x1, y1
