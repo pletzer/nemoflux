@@ -1,45 +1,33 @@
 import mint
 import netCDF4
 import numpy
+import defopt
+import re
 
 class Grid(object):
 
-    def __init__(self, cellDataFile, varName)
-    """Constructor
-
-    :param cellDataFile: netCDF file containing cell centred data
-    :param varName: variable name of the cell centred data
-    """
+    def __init__(self, tFile):
     
-    nc = netCDF4.Dataset(cellDataFile)
+        nc = netCDF4.Dataset(tFile)
+        # read the cell bounds
+        bounds_lat = nc.variables['bounds_lat'][:]
+        bounds_lon = nc.variables['bounds_lon'][:]
+        nc.close()
 
-    # get the variable
-    var = nv.variables[varName]
-    ny, nx = var.shape
-    coordNames = var.coordinates.split()
+        ny, nx, nvertex = bounds_lat.shape
+        numCells = ny * nx
+        self.points = numpy.zeros((numCells, 4, 3), numpy.float64)
 
-    # gather the latitues and longitudes
-    lonName = ''
-    latName = ''
-    for cn in coordNames:
-        v = nc.variables[cn]
-        if v.standard_name == 'longitude':
-            lonName = cn
-        elif v.standard_name == 'latitude':
-            latName = cn
+        k = 0
+        for j in range(ny):
+            for i in range(nx):
+                for vertex in range(4):
+                    x, y = bounds_lon[j, i, vertex], bounds_lat[j, i, vertex]
+                    self.points[k, vertex, :] = x, y, 0.0
+            k += 1
 
-    vLon = nc.variables(lonName)
-    vLat = nc.variables(latName)
-
-    # read the cell bounds
-    boundsLon = nc.variables[vLon.bounds][:]
-    boundsLat = nc.variables[vLon.bounds][:]
-
-    self.points = numpy.zeros((numCells, 4, 3), numpy.float64)
-    nc.close()
-
-    self.grid = mint.Grid()
-    self.grid.setPoints(self.points)
+        self.grid = mint.Grid()
+        self.grid.setPoints(self.points)
 
     def dump(self, fileName):
         """Dump the grid data to a VTK file
@@ -48,5 +36,15 @@ class Grid(object):
         """
         self.grid.dump(fileName)
 
+def main(*, tFile: str):
+    """Create grid
+    :param tFile: netCDF file containing t grid data
+   """
+    gr = Grid(tFile)
+    vtkFile = re.sub('.nc', '.vtk', tFile)
+    gr.dump(vtkFile)
+
+if __name__ == '__main__':
+    defopt.run(main)
 
 

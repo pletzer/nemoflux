@@ -114,7 +114,9 @@ class LatLonDataGen(object):
         ncV.close()
 
 
-def main(*, potentialFunction: str="x", prefix: str, xmin: float=0.0, xmax: float=360., ymin: float=-90., ymax: float=90., nx: int=10, ny: int=4):
+def main(*, potentialFunction: str="x", prefix: str, 
+            xmin: float=0.0, xmax: float=360., ymin: float=-90., ymax: float=90., 
+            nx: int=10, ny: int=4):
     """Generate data
     :param prefix: file prefix
     :param xmin: min longitude
