@@ -13,48 +13,54 @@ class FluxCalc(object):
         self.pli.build(self.gr.getMintGrid(), targetPoints,
                        counterclock=False, periodX=360.0)
 
-        numCells = self.gr.getNumCells()
-        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
-
         ncU = netCDF4.Dataset(uFile)
         uo = ncU.variables['uo'][:]
         ncU.close()
+        # set the velocity to zero where missing
+        uo = numpy.ma.filled(uo, 0.0)
 
         ncV = netCDF4.Dataset(vFile)
         vo = ncV.variables['vo'][:]
         ncV.close()
+        # set the velocity to zero where missing
+        vo = numpy.ma.filled(vo, 0.0)
        
-        ny, nx = uo.shape
+        nz, ny, nx = uo.shape
 
-        k = 0
-        for j in range(ny):
-            for i in range(nx):
+        numCells = self.gr.getNumCells()
+        self.integratedVelocity = numpy.zeros((nz, numCells, 4), numpy.float64)
 
-                x0, y0, _ = self.gr.getPoint(k, 0)
-                x1, y1, _ = self.gr.getPoint(k, 1)
-                x2, y2, _ = self.gr.getPoint(k, 2)
-                x3, y3, _ = self.gr.getPoint(k, 3)
+        for k in range(nz):
+            cellId = 0
+            for j in range(ny):
+                for i in range(nx):
 
-                # NEED TO USE ds IN METRES (TO CHANGE)
+                    x0, y0, _ = self.gr.getPoint(cellId, 0)
+                    x1, y1, _ = self.gr.getPoint(cellId, 1)
+                    x2, y2, _ = self.gr.getPoint(cellId, 2)
+                    x3, y3, _ = self.gr.getPoint(cellId, 3)
 
-                # south
-                ds = numpy.sqrt((x1 - x0)**2 + (y1 - y0)**2)
-                if j >= 1:
-                    self.integratedVelocity[k, 0] = vo[j - 1, i] * ds
+                    # NEED TO USE ds IN METRES (TO CHANGE)
 
-                # east
-                ds = numpy.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-                self.integratedVelocity[k, 1] = uo[j, i] * ds
+                    # south
+                    ds = numpy.sqrt((x1 - x0)**2 + (y1 - y0)**2)
+                    if j >= 1:
+                        ds = self.gr.getEdgeArcLength(cellId, 0)
+                        self.integratedVelocity[k, cellId, 0] = vo[k, j - 1, i] * ds
 
-                # north
-                ds = numpy.sqrt((x3 - x2)**2 + (y3 - y2)**2)
-                self.integratedVelocity[k, 2] = vo[j, i] * ds
+                    # east
+                    ds = self.gr.getEdgeArcLength(cellId, 1)
+                    self.integratedVelocity[k, cellId, 1] = uo[k, j, i] * ds
 
-                # west, periodic boundary
-                ds = numpy.sqrt((x3 - x0)**2 + (y3 - y0)**2)
-                self.integratedVelocity[k, 3] = uo[j, i - 1] * ds
+                    # north
+                    ds = self.gr.getEdgeArcLength(cellId, 2)
+                    self.integratedVelocity[k, cellId, 2] = vo[k, j, i] * ds
 
-                k += 1
+                    # west, periodic boundary
+                    ds = self.gr.getEdgeArcLength(cellId, 3)
+                    self.integratedVelocity[k, cellId , 3] = uo[k, j, i - 1] * ds
+
+                    cellId += 1
 
     def getFlux(self):
         return self.pli.getIntegral(self.integratedVelocity)
@@ -64,6 +70,7 @@ def main(*, tFile: str, uFile: str, vFile: str, xyStr: str):
     :param tFile: netCDF file containing t grid data
     :param uFile: netCDF file containing U component data
     :param vFile: netCDF file containing V component data
+    :param xyStr: array of target points
     """
     xyVals = numpy.array(eval(xyStr))
     numPoints = xyVals.shape[0]

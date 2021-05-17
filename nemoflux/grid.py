@@ -3,6 +3,7 @@ import netCDF4
 import numpy
 import defopt
 import re
+import vtk
 
 class Grid(object):
 
@@ -28,6 +29,10 @@ class Grid(object):
 
         self.grid = mint.Grid()
         self.grid.setPoints(self.points)
+        self.grid.computeEdgeArcLengths()
+        
+    def getEdgeArcLength(self, cellId, edgeIndex):
+    	return self.grid.getEdgeArcLength(cellId, edgeIndex)
 
     def getMintGrid(self):
         return self.grid
