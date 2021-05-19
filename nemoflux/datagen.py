@@ -12,7 +12,6 @@ class LatLonDataGen(object):
 
     def __init__(self, prefix=''):
         self.prefix = prefix
-        self.earthRadius = 6371000. # in metres
 
     def setBoundingBox(self, xmin, xmax, ymin, ymax, zmin, zmax):
         self.xmin = xmin
@@ -51,10 +50,12 @@ class LatLonDataGen(object):
         self.ztop  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0  )/float(self.nz))**2 for k in range(self.nz)])
         self.zbot  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 1  )/float(self.nz))**2 for k in range(self.nz)])
 
+        A = geo.EARTH_RADIUS # for evaluation
+
         # iterate over cells
         for k in range(self.nz):
             dz = self.ztop[k] - self.zbot[k]
-            z = self.zhalf[k]
+            z = self.zhalf[k] # z is at half level
             for j in range(self.ny):
                 y0 = self.ymin + j*dy
                 y1 = y0 + dy
@@ -84,8 +85,8 @@ class LatLonDataGen(object):
                     x, y = x1, y0
                     p0 = numpy.array((x, y, 0.))
                     phi0 = eval(potentialFunction)
-                    self.uExtensive[k, j, i] = phi1 - phi0
-                    self.uArea[k, j, i] = geo.getArcLength(p0, p1, radius=self.earthRadius) * dz
+                    self.uExtensive[k, j, i] = (phi1 - phi0) * dz
+                    self.uArea[k, j, i] = geo.getArcLength(p0, p1,  radius=geo.EARTH_RADIUS) * dz
 
                     # north side of the cell
                     x, y = x1, y1
@@ -94,8 +95,8 @@ class LatLonDataGen(object):
                     x, y = x0, y1
                     p0 = numpy.array((x, y, 0.))
                     phi0 = eval(potentialFunction)
-                    self.vExtensive[k, j, i] = (phi1 - phi0)
-                    self.vArea[k, j, i] = geo.getArcLength(p0, p1, radius=self.earthRadius) * dz
+                    self.vExtensive[k, j, i] = (phi1 - phi0) * dz
+                    self.vArea[k, j, i] = geo.getArcLength(p0, p1, radius=geo.EARTH_RADIUS) * dz
 
     def rotatePole(self, deltaLonDeg=0., deltaLatDeg=0.):
 
@@ -162,6 +163,7 @@ class LatLonDataGen(object):
                     if vertex > 0 and self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] > -270.:
                         self.bounds_lon[j, i, vertex] -= 360.
 
+        # compute the face areas
         for k in range(self.nz):
             dz = self.ztop[k] - self.zbot[k]
             for j in range(self.ny):
@@ -169,11 +171,11 @@ class LatLonDataGen(object):
                     # east side of the cell
                     p1 = numpy.array((self.bounds_lon[j, i, 2], self.bounds_lon[j, i, 2], 0.))
                     p0 = numpy.array((self.bounds_lon[j, i, 1], self.bounds_lon[j, i, 1], 0.))
-                    self.uArea = geo.getArcLength(p0, p1, radius=self.earthRadius) * dz
+                    self.uArea[k, j, i] = geo.getArcLength(p0, p1, radius=geo.EARTH_RADIUS) * dz
                     # north side of the cell
                     p1 = numpy.array((self.bounds_lon[j, i, 3], self.bounds_lon[j, i, 3], 0.))
                     p0 = numpy.array((self.bounds_lon[j, i, 2], self.bounds_lon[j, i, 2], 0.))
-                    self.vArea = geo.getArcLength(p0, p1, radius=self.earthRadius) * dz
+                    self.vArea[k, j, i] = geo.getArcLength(p0, p1, radius=geo.EARTH_RADIUS) * dz
 
     def save(self):
 
@@ -216,7 +218,7 @@ class LatLonDataGen(object):
         uo.standard_name = 'sea_water_x_velocity'
         uo.units = 'm/s'
         uo[:] = self.uExtensive / self.uArea
-        ncU.earthRadius = f'earth radius = {self.earthRadius} in metres'
+        ncU.earthRadius = f'earth radius = {geo.EARTH_RADIUS} in metres'
         ncU.close()
 
         ncV = netCDF4.Dataset(self.prefix + '_V.nc', 'w')
@@ -239,7 +241,7 @@ class LatLonDataGen(object):
         ncV.close()
 
 
-def main(*, potentialFunction: str="(1. - z/self.zmax)*cos(x*pi/180.)*sin(y*pi/180.)", prefix: str, 
+def main(*, potentialFunction: str="(1. - z/self.zmax)*x*2*pi*A/360.", prefix: str, 
             xmin: float=0.0, xmax: float=360., ymin: float=-90., ymax: float=90., 
             nx: int=10, ny: int=4, nz: int=10, deltaLonDeg: float=0., deltaLatDeg: float=0.):
     """Generate data
