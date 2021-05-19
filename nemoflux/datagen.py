@@ -218,6 +218,10 @@ class LatLonDataGen(object):
         depthu_bounds = ncU.createVariable('depthu_bounds', REAL, ('z', 'axis_nbounds'))
         depthu_bounds[:, 0] = self.ztop
         depthu_bounds[:, 1] = self.zbot
+        uArea = ncU.createVariable('uArea', REAL, ('z', 'y', 'x'))
+        uArea.long_name = 'u face area'
+        uArea.units = 'm2'
+        uArea[:] = self.uArea
         uo = ncU.createVariable('uo', REAL, ('z', 'y', 'x'), fill_value=1.e20)
         uo.standard_name = 'sea_water_x_velocity'
         uo.units = 'm/s'
@@ -235,6 +239,10 @@ class LatLonDataGen(object):
         depthv.units = 'm'
         depthv.bounds = 'depthv_bounds'
         depthv[:] = self.zhalf
+        vArea = ncV.createVariable('vArea', REAL, ('z', 'y', 'x'))
+        vArea.long_name = 'v face area'
+        vArea.units = 'm2'
+        vArea[:] = self.vArea
         depthv_bounds = ncV.createVariable('depthv_bounds', REAL, ('z', 'axis_nbounds'))
         depthv_bounds[:, 0] = self.ztop
         depthv_bounds[:, 1] = self.zbot
