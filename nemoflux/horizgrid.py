@@ -5,7 +5,7 @@ import defopt
 import re
 import vtk
 
-class Grid(object):
+class HorizGrid(object):
 
     def __init__(self, tFile):
     
@@ -30,6 +30,22 @@ class Grid(object):
         self.grid = mint.Grid()
         self.grid.setPoints(self.points)
         self.grid.computeEdgeArcLengths()
+
+        # compute the areas
+        dx10 = self.points[:, 1, 0] - self.points[:, 0, 0]
+        dy10 = self.points[:, 1, 1] - self.points[:, 0, 1]
+        dx30 = self.points[:, 3, 0] - self.points[:, 0, 0]
+        dy30 = self.points[:, 3, 1] - self.points[:, 0, 1]
+        self.areas0 = dx10*dy30 - dx30*dy10
+
+        dx32 = self.points[:, 3, 0] - self.points[:, 2, 0]
+        dy32 = self.points[:, 3, 1] - self.points[:, 2, 1]
+        dx12 = self.points[:, 1, 0] - self.points[:, 2, 0]
+        dy12 = self.points[:, 1, 1] - self.points[:, 2, 1]
+        self.areas2 = dx32*dy12 - dx12*dy32
+
+        self.grid.attach('areas0', self.areas0)
+        self.grid.attach('areas2', self.areas2)
         
     def getEdgeArcLength(self, cellId, edgeIndex):
     	return self.grid.getEdgeArcLength(cellId, edgeIndex)
@@ -43,6 +59,7 @@ class Grid(object):
     def getPoint(self, k, vertex):
         return self.points[k, vertex, :]
 
+
     def dump(self, fileName):
         """Dump the grid data to a VTK file
 
@@ -54,7 +71,7 @@ def main(*, tFile: str):
     """Create grid
     :param tFile: netCDF file containing t grid data
    """
-    gr = Grid(tFile)
+    gr = HorizGrid(tFile)
     vtkFile = re.sub('.nc', '.vtk', tFile)
     gr.dump(vtkFile)
 
