@@ -138,8 +138,10 @@ class LatLonDataGen(object):
                 xyz0 = rho * cos_lam, rho * sin_lam, sin_the
                 xyz1 = numpy.dot(transfMatrix, xyz0)
 
-                self.nav_lat[j, i] = 180. * math.asin(xyz1[2]) / numpy.pi
-                self.nav_lon[j, i] = 180. * math.atan2(xyz1[1], xyz1[0]) / numpy.pi
+                self.nav_lat[j, i] = 180. * math.asin(xyz1[2]) / pi
+                self.nav_lon[j, i] = 180. * math.atan2(xyz1[1], xyz1[0]) / pi
+                if self.nav_lon[j, i] < 0.:
+                    self.nav_lon[j, i] += 360.
 
                 for vertex in range(4):
 
@@ -156,12 +158,14 @@ class LatLonDataGen(object):
 
                     self.bounds_lat[j, i, vertex] = 180. * math.asin(xyz1[2]) / numpy.pi
                     self.bounds_lon[j, i, vertex] = 180. * math.atan2(xyz1[1], xyz1[0]) / numpy.pi
+                    if self.bounds_lon[j, i, vertex] < 0:
+                        self.bounds_lon[j, i, vertex] += 360.
 
-                    # # add/subtract 360 deg to make the cell well behaved
-                    # if vertex > 0 and self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] < -270.:
-                    #     self.bounds_lon[j, i, vertex] += 360.
-                    # if vertex > 0 and self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] > -270.:
-                    #     self.bounds_lon[j, i, vertex] -= 360.
+                    # add/subtract 360 deg to make the cell well behaved
+                    if vertex > 0 and self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] < -270.:
+                        self.bounds_lon[j, i, vertex] += 360.
+                    if vertex > 0 and self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] > +270.:
+                        self.bounds_lon[j, i, vertex] -= 360.
 
         # compute the face areas
         for k in range(self.nz):
