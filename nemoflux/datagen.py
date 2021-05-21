@@ -162,7 +162,13 @@ class DataGen(object):
                     self.bounds_lat[j, i, vertex] = 180. * math.asin(xyz1[2]) / numpy.pi
                     self.bounds_lon[j, i, vertex] = 180. * math.atan2(xyz1[1], xyz1[0]) / numpy.pi
                     # use the convention 0 <= lon < 360
-                    self.bounds_lon[j, i, vertex] %= 360.
+                    # self.bounds_lon[j, i, vertex] %= 360.
+
+                    # date line fix
+                    if self.bounds_lon[j, i, vertex] - self.nav_lon[j, i] > 270.:
+                        self.bounds_lon[j, i, vertex] -= 360.
+                    if self.bounds_lon[j, i, vertex] - self.nav_lon[j, i] < -270.:
+                        self.bounds_lon[j, i, vertex] += 360.
 
     def save(self):
 
