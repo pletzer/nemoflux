@@ -98,10 +98,10 @@ class DataGen(object):
                     p1 = numpy.array((x1, y1, 0.))
                     p2 = numpy.array((x2, y2, 0.))
                     p3 = numpy.array((x3, y3, 0.))
-                    # east
+                    # east, - d phi/ dy
                     self.u[k, j, i] = -(self.potential[k, j, i, 2] - self.potential[k, j, i, 1]) / geo.getArcLength(p2, p1, radius=geo.EARTH_RADIUS)
-                    # north
-                    self.v[k, j, i] = -(self.potential[k, j, i, 2] - self.potential[k, j, i, 3]) / geo.getArcLength(p2, p3, radius=geo.EARTH_RADIUS)
+                    # north, + d phi/ dx
+                    self.v[k, j, i] = +(self.potential[k, j, i, 2] - self.potential[k, j, i, 3]) / geo.getArcLength(p2, p3, radius=geo.EARTH_RADIUS)
 
     def rotatePole(self, deltaLonDeg=0., deltaLatDeg=0.):
 
