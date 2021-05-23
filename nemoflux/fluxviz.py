@@ -119,23 +119,49 @@ class FluxViz(object):
                     self.edgeFluxesV.SetTuple(cellId, flxV)
 
                     self.minFlux = min(self.minFlux, flxU[0], flxV[0])
-                    self.maxFlux = min(self.minFlux, flxU[0], flxV[0])
+                    self.maxFlux = max(self.minFlux, flxU[0], flxV[0])
 
                 # increment the cell counter
                 cellId += 1
 
+        print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
+
     def show(self):
 
+        xAxis = vtk.vtkAxisActor()
+        xAxis.SetPoint1((0., -90., 0.))
+        xAxis.SetPoint2((360., -90., 0.))
+        #xAxis.SetTitle('longitude deg.')
+        xAxis.SetDeltaRangeMajor(10.)
+
+        yAxis = vtk.vtkAxisActor()
+        yAxis.SetPoint1((0., -90., 0.))
+        yAxis.SetPoint2((0., 90., 0.))
+        #yAxis.SetTitle('latitude deg.')
+        yAxis.SetDeltaRangeMajor(10.)
+
         lut = vtk.vtkLookupTable()
-        lut.SetHueRange(0., 0.666)
+        lut.SetHueRange(0.666, 0.0)
         lut.SetTableRange(self.minFlux, self.maxFlux)
         lut.Build()
+
+        cbar = vtk.vtkScalarBarActor()
+        cbar.SetLookupTable(lut)
 
         mapperU = vtk.vtkDataSetMapper()
         mapperU.SetInputData(self.vGridU)
         mapperU.SetLookupTable(lut)
+        mapperU.SetUseLookupTableScalarRange(1)
         actorU = vtk.vtkActor()
         actorU.SetMapper(mapperU)
+
+        mapperV = vtk.vtkDataSetMapper()
+        mapperV.SetInputData(self.vGridV)
+        mapperV.SetLookupTable(lut)
+        mapperV.SetUseLookupTableScalarRange(1)
+        actorV = vtk.vtkActor()
+        actorV.SetMapper(mapperV)
+
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
         # perform appropriate camera or actor manipulation depending on the
@@ -148,8 +174,13 @@ class FluxViz(object):
 
         # Add the actors to the renderer, set the background and size
         ren.AddActor(actorU)
+        ren.AddActor(actorV)
+        ren.AddActor(cbar)
+        ren.AddActor(xAxis)
+        ren.AddActor(yAxis)
+        ren.SetBackground((0.7, 0.7, 0.7))
         renWin.SetSize(1260, 960)
-        renWin.SetWindowName('Vertically integrated fluxes')
+        renWin.SetWindowName('Vertically integrated edge flux')
 
         # This allows the interactor to initalize itself. It has to be
         # called before an event loop.
@@ -157,8 +188,8 @@ class FluxViz(object):
 
         # We'll zoom in a little by accessing the camera and invoking a "Zoom"
         # method on it.
-        ren.ResetCamera()
-        ren.GetActiveCamera().Zoom(1.5)
+        # ren.ResetCamera()
+        # ren.GetActiveCamera().Zoom(1.5)
         renWin.Render()
 
         # Start the event loop.

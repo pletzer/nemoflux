@@ -75,6 +75,7 @@ class DataGen(object):
                 self.nav_lon[j, i] = xm
 
     def applyPotential(self, potentialFunction):
+        zmin, zmax = self.zmin, self.zmax
         self.potential = numpy.zeros((self.nz, self.ny, self.nx, 4), numpy.float64)
         A = geo.EARTH_RADIUS
         for k in range(self.nz):
@@ -248,9 +249,9 @@ class DataGen(object):
         ncV.close()
 
 
-def main(*, potentialFunction: str="(1. - z/self.zmax)*x*2*pi*A/360.", prefix: str, 
+def main(*, potentialFunction: str="(1. - z/zmax)*y*2*pi*A/360.", prefix: str, 
             xmin: float=0.0, xmax: float=360., ymin: float=-90., ymax: float=90., 
-            nx: int=10, ny: int=4, nz: int=10, deltaLonDeg: float=0., deltaLatDeg: float=0.):
+            nx: int=10, ny: int=4, nz: int=3, deltaLonDeg: float=0., deltaLatDeg: float=0.):
     """Generate data
     :param prefix: file prefix
     :param xmin: min longitude
@@ -263,7 +264,7 @@ def main(*, potentialFunction: str="(1. - z/self.zmax)*x*2*pi*A/360.", prefix: s
     """
     lldg = DataGen(prefix)
     lldg.setSizes(nx, ny, nz)
-    lldg.setBoundingBox(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, zmin=0., zmax=1000.)
+    lldg.setBoundingBox(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, zmin=0., zmax=1.)
     lldg.build()
     lldg.rotatePole(deltaLonDeg=deltaLonDeg, deltaLatDeg=deltaLatDeg)
     lldg.applyPotential(potentialFunction)
