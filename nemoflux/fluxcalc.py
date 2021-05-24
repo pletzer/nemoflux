@@ -47,7 +47,7 @@ class FluxCalc(object):
                 ds32 = geo.getArcLength(p3, p2, radius=geo.EARTH_RADIUS)
                 ds03 = geo.getArcLength(p0, p3, radius=geo.EARTH_RADIUS)
 
-                # integrate vertically
+                # integrate fluxes vertically
                 for k in range(nz):
 
                     dz = -(bounds_depth[k, 1] - bounds_depth[k, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
@@ -62,8 +62,11 @@ class FluxCalc(object):
                     #  0-----------1
 
                     # south
-                    if i > 0:
+                    if j > 0:
                         self.integratedVelocity[cellId, 0] += vo[k, j-1, i+0] * ds01 * dz
+                    # else:
+                    #     # folding, assuming even nx
+                    #     self.integratedVelocity[cellId, 0] += vo[k, j, (i+nx//2)%nx] * ds01 * dz
 
                     # east
                     self.integratedVelocity[cellId, 1] += uo[k, j+0, i+0] * ds12 * dz
@@ -71,9 +74,8 @@ class FluxCalc(object):
                     # north
                     self.integratedVelocity[cellId, 2] += vo[k, j+0, i+0] * ds32 * dz
 
-                    # west
-                    if j > 0:
-                        self.integratedVelocity[cellId, 3] += uo[k, j+0, i-1] * ds03 * dz
+                    # periodic west
+                    self.integratedVelocity[cellId, 3] += uo[k, j+0, (i-1)%nx] * ds03 * dz
 
                 cellId += 1
 
