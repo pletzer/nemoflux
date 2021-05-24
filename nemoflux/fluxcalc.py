@@ -5,7 +5,6 @@ from horizgrid import HorizGrid
 import geo
 import defopt
 
-ZAXIS, YAXIS, XAXIS = 0, 1, 2
 
 class FluxCalc(object):
 
@@ -35,6 +34,11 @@ class FluxCalc(object):
         numCells = self.gr.getNumCells()
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
 
+        # integrate vertically
+        dz = -(bounds_depth[:, 1] - bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+        uo = numpy.tensordot(dz, uo, axes=(0,0))
+        vo = numpy.tensordot(dz, vo, axes=(0,0))
+
         cellId = 0
         for j in range(ny):
             for i in range(nx):
@@ -51,8 +55,6 @@ class FluxCalc(object):
 
                 # integrate vertically
 
-                dz = -(bounds_depth[:, 1] - bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
-
                 #        ^
                 #        |
                 #  3-----V-----2
@@ -64,25 +66,26 @@ class FluxCalc(object):
 
                 # south
                 if j > 0:
-                    self.integratedVelocity[cellId, 0] = vo[:, j-1, i+0] * ds01 * dz
+                    self.integratedVelocity[cellId, 0] = vo[j-1, i+0] * ds01
                 # else:
                 #     # folding, assuming even nx
-                #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01 * dz
+                #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
 
                 # east
-                self.integratedVelocity[cellId, 1] = uo[:, j+0, i+0] * ds12 * dz
+                self.integratedVelocity[cellId, 1] = uo[j+0, i+0] * ds12
 
                 # north
-                self.integratedVelocity[cellId, 2] = vo[:, j+0, i+0] * ds32 * dz
+                self.integratedVelocity[cellId, 2] = vo[j+0, i+0] * ds32
 
                 # periodic west
-                self.integratedVelocity[cellId, 3] = uo[:, j+0, (i-1)%nx] * ds03 * dz
-
+                self.integratedVelocity[cellId, 3] = uo[j+0, (i-1)%nx] * ds03
 
                 cellId += 1
 
+
     def getFlux(self):
         return self.pli.getIntegral(self.integratedVelocity)
+
 
 def main(*, tFile: str, uFile: str, vFile: str, xyStr: str):
     """Compute flux
