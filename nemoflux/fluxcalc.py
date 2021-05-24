@@ -5,6 +5,8 @@ from horizgrid import HorizGrid
 import geo
 import defopt
 
+ZAXIS, YAXIS, XAXIS = 0, 1, 2
+
 class FluxCalc(object):
 
     def __init__(self, tFile, uFile, vFile, targetPoints):
@@ -27,7 +29,7 @@ class FluxCalc(object):
             vo = nc.variables['vo'][:]
         # set the velocity to zero where missing
         vo = numpy.ma.filled(vo, 0.0)
-       
+
         nz, ny, nx = uo.shape
 
         numCells = self.gr.getNumCells()
@@ -47,35 +49,35 @@ class FluxCalc(object):
                 ds32 = geo.getArcLength(p3, p2, radius=geo.EARTH_RADIUS)
                 ds03 = geo.getArcLength(p0, p3, radius=geo.EARTH_RADIUS)
 
-                # integrate fluxes vertically
-                for k in range(nz):
+                # integrate vertically
 
-                    dz = -(bounds_depth[k, 1] - bounds_depth[k, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+                dz = -(bounds_depth[:, 1] - bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
 
-                    #        ^
-                    #        |
-                    #  3-----V-----2
-                    #  |           |
-                    #  |->   T     U->
-                    #  |     ^     |
-                    #  |     |     |
-                    #  0-----------1
+                #        ^
+                #        |
+                #  3-----V-----2
+                #  |           |
+                #  |->   T     U->
+                #  |     ^     |
+                #  |     |     |
+                #  0-----------1
 
-                    # south
-                    if j > 0:
-                        self.integratedVelocity[cellId, 0] += vo[k, j-1, i+0] * ds01 * dz
-                    # else:
-                    #     # folding, assuming even nx
-                    #     self.integratedVelocity[cellId, 0] += vo[k, j, (i+nx//2)%nx] * ds01 * dz
+                # south
+                if j > 0:
+                    self.integratedVelocity[cellId, 0] = vo[:, j-1, i+0] * ds01 * dz
+                # else:
+                #     # folding, assuming even nx
+                #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01 * dz
 
-                    # east
-                    self.integratedVelocity[cellId, 1] += uo[k, j+0, i+0] * ds12 * dz
+                # east
+                self.integratedVelocity[cellId, 1] = uo[:, j+0, i+0] * ds12 * dz
 
-                    # north
-                    self.integratedVelocity[cellId, 2] += vo[k, j+0, i+0] * ds32 * dz
+                # north
+                self.integratedVelocity[cellId, 2] = vo[:, j+0, i+0] * ds32 * dz
 
-                    # periodic west
-                    self.integratedVelocity[cellId, 3] += uo[k, j+0, (i-1)%nx] * ds03 * dz
+                # periodic west
+                self.integratedVelocity[cellId, 3] = uo[:, j+0, (i-1)%nx] * ds03 * dz
+
 
                 cellId += 1
 
