@@ -19,30 +19,12 @@ class HorizGrid(object):
 
         ny, nx, nvertex = bounds_lat.shape
         numCells = ny * nx
-        self.points = numpy.zeros((numCells, 4, 3), numpy.float64)
-        self.cellAreas = numpy.zeros((numCells,), numpy.float64)
-
-        cellId = 0
-        for j in range(ny):
-            for i in range(nx):
-                for vertex0 in range(4):
-                    vertex1 = (vertex0 + 1) % 4
-                    vertex2 = (vertex0 - 1) % 4
-                    x0, y0 = bounds_lon[j, i, vertex0], bounds_lat[j, i, vertex0]
-                    x1, y1 = bounds_lon[j, i, vertex1], bounds_lat[j, i, vertex1]
-                    x2, y2 = bounds_lon[j, i, vertex2], bounds_lat[j, i, vertex2]
-                    self.points[cellId, vertex0, :] = x0, y0, 0.0
-                    dp10 = numpy.array((x1 - x0, y1 - y0, 0.))
-                    dp20 = numpy.array((x2 - x0, y2 - y0, 0.))
-                    area = numpy.cross(dp10, dp20)
-                    self.cellAreas[cellId] += 0.25*area[2]
-                # increment the cell counter
-                cellId += 1
-
+        self.points = numpy.zeros((ny, nx, nvertex, 3), numpy.float64)
+        self.points[..., 0] = bounds_lon
+        self.points[..., 1] = bounds_lat
+        self.points = self.points.reshape((numCells, nvertex, 3))
         self.grid = mint.Grid()
         self.grid.setPoints(self.points)
-        self.grid.computeEdgeArcLengths()
-        self.grid.attach('cellAreas', self.cellAreas)
 
     def getMintGrid(self):
         return self.grid

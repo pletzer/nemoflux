@@ -34,10 +34,10 @@ class FluxCalc(object):
         numCells = self.gr.getNumCells()
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
 
-        # integrate vertically
+        # integrate vertically, multiplying by the thickness of the layers
         dz = -(bounds_depth[:, 1] - bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
-        uo = numpy.tensordot(dz, uo, axes=(0,0))
-        vo = numpy.tensordot(dz, vo, axes=(0,0))
+        uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
+        vo = numpy.tensordot(dz, vo, axes=(0, 0))
 
         cellId = 0
         for j in range(ny):
