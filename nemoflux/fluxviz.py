@@ -9,65 +9,65 @@ class FluxViz(object):
     def __init__(self, tFile, uFile, vFile):
 
         # read the cell bounds
-        nc = netCDF4.Dataset(tFile)
-        bounds_lat = nc.variables['bounds_lat'][:]
-        bounds_lon = nc.variables['bounds_lon'][:]
-        depth_half = nc.variables['deptht'][:]
-        bounds_depth = nc.variables['deptht_bounds'][:]
-        nc.close()
+        with netCDF4.Dataset(tFile) as nc:
+            bounds_lat = nc.variables['bounds_lat'][:]
+            bounds_lon = nc.variables['bounds_lon'][:]
+            depth_half = nc.variables['deptht'][:]
+            bounds_depth = nc.variables['deptht_bounds'][:]
 
         # read u
-        nc = netCDF4.Dataset(uFile)
-        uo = nc.variables['uo'][:]
-        nc.close()
+        with netCDF4.Dataset(uFile) as nc:
+            uo = nc.variables['uo'][:]
         # set the velocity to zero where missing
         uo = numpy.ma.filled(uo, 0.0)
 
         # read v
-        nc = netCDF4.Dataset(vFile)
-        vo = nc.variables['vo'][:]
-        nc.close()
+        with netCDF4.Dataset(vFile) as nc:
+            vo = nc.variables['vo'][:]
         # set the velocity to zero where missing
         vo = numpy.ma.filled(vo, 0.0)
 
         nz, ny, nx = uo.shape
         numCells = ny * nx
+        self.ny, self.nx = ny, nx
 
         # points, 4 points per cell, 3D
         self.xyz = numpy.zeros((ny, nx, 4, 3), numpy.float64)
         self.xyz[..., 0] = bounds_lon
         self.xyz[..., 1] = bounds_lat
 
-        self.vPointData = vtk.vtkDoubleArray()
-        self.vPointData.SetNumberOfComponents(3)
-        self.vPointData.SetNumberOfTuples(4 * numCells)
-        self.vPointData.SetVoidArray(self.xyz, 4 * numCells * 3, 1)
+        self.pointData = vtk.vtkDoubleArray()
+        self.pointData.SetNumberOfComponents(3)
+        self.pointData.SetNumberOfTuples(4 * numCells)
+        self.pointData.SetVoidArray(self.xyz, 4 * numCells * 3, 1)
 
-        self.vPoints = vtk.vtkPoints()
-        self.vPoints.SetData(self.vPointData)
+        self.points = vtk.vtkPoints()
+        self.points.SetData(self.pointData)
 
         # 1 grid for the U fluxes, 1 grid for the V fluxes
-        self.vGridU = vtk.vtkUnstructuredGrid()
-        self.vGridU.SetPoints(self.vPoints)
+        self.gridU = vtk.vtkPolyData()
+        self.gridU.SetPoints(self.points)
         self.edgeFluxesU = vtk.vtkDoubleArray()
-        self.edgeFluxesU.SetName('verticallyIntegratedUFlux')
+        self.edgeFluxesU.SetName('U')
         self.edgeFluxesU.SetNumberOfComponents(1)
         self.edgeFluxesU.SetNumberOfTuples(numCells)
         self.edgeFluxesU.Fill(0.)
 
-        self.vGridV = vtk.vtkUnstructuredGrid()
-        self.vGridV.SetPoints(self.vPoints)
+        self.gridV = vtk.vtkPolyData()
+        self.gridV.SetPoints(self.points)
         self.edgeFluxesV = vtk.vtkDoubleArray()
-        self.edgeFluxesU.SetName('verticallyIntegratedVFlux')
+        self.edgeFluxesU.SetName('V')
         self.edgeFluxesV.SetNumberOfComponents(1)
         self.edgeFluxesV.SetNumberOfTuples(numCells)
         self.edgeFluxesV.Fill(0.)
 
-        self.vGridU.Allocate()
-        self.vGridV.Allocate()
+        self.gridU.Allocate()
+        self.gridV.Allocate()
 
-        self.vGridU.GetCellData().SetScalars(self.edgeFluxesU)
-        self.vGridV.GetCellData().SetScalars(self.edgeFluxesV)
+        self.gridU.GetCellData().SetScalars(self.edgeFluxesU)
+        #self.gridU.GetCellData().SetActiveScalars('U')
+        self.gridV.GetCellData().SetScalars(self.edgeFluxesV)
+        #self.gridV.GetCellData().SetActiveScalars('verticallyIntegratedVFlux')
 
         ptIds = vtk.vtkIdList()
         ptIds.SetNumberOfIds(2)
@@ -90,16 +90,16 @@ class FluxViz(object):
                 #        |
                 #  3-----V-----2
                 #  |           |
-                #  |           U-->
+                #  |     T     U-->
                 #  |           |
                 #  0-----------1
 
 
                 ptIds.SetId(0, 4*cellId + 1); ptIds.SetId(1, 4*cellId + 2)
-                self.vGridU.InsertNextCell(vtk.VTK_LINE, ptIds)
+                self.gridU.InsertNextCell(vtk.VTK_LINE, ptIds)
 
                 ptIds.SetId(0, 4*cellId + 3); ptIds.SetId(1, 4*cellId + 2)
-                self.vGridV.InsertNextCell(vtk.VTK_LINE, ptIds)
+                self.gridV.InsertNextCell(vtk.VTK_LINE, ptIds)
 
                 p1[:] = self.xyz[j, i, 1, :]
                 p2[:] = self.xyz[j, i, 2, :]
@@ -141,22 +141,36 @@ class FluxViz(object):
         yAxis.SetDeltaRangeMajor(10.)
 
         lut = vtk.vtkLookupTable()
-        lut.SetHueRange(0.666, 0.0)
+        lut.SetHueRange(0.6, 0.07)
         lut.SetTableRange(self.minFlux, self.maxFlux)
         lut.Build()
 
         cbar = vtk.vtkScalarBarActor()
         cbar.SetLookupTable(lut)
 
-        mapperU = vtk.vtkDataSetMapper()
-        mapperU.SetInputData(self.vGridU)
+        radiusMin = 0.1*min(360/self.nx, 180/self.ny)
+
+        tubesU = vtk.vtkTubeFilter()
+        tubesU.SetInputData(self.gridU)
+        tubesU.SetRadius(radiusMin) # min radius
+        tubesU.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
+        tubesU.SetRadiusFactor(100)
+
+        tubesV = vtk.vtkTubeFilter()
+        tubesV.SetInputData(self.gridV)
+        tubesV.SetRadius(radiusMin) # min radius
+        tubesV.SetRadiusFactor(100)
+        tubesV.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
+
+        mapperU = vtk.vtkPolyDataMapper()
+        mapperU.SetInputConnection(tubesU.GetOutputPort())
         mapperU.SetLookupTable(lut)
         mapperU.SetUseLookupTableScalarRange(1)
         actorU = vtk.vtkActor()
         actorU.SetMapper(mapperU)
 
-        mapperV = vtk.vtkDataSetMapper()
-        mapperV.SetInputData(self.vGridV)
+        mapperV = vtk.vtkPolyDataMapper()
+        mapperV.SetInputConnection(tubesV.GetOutputPort())
         mapperV.SetLookupTable(lut)
         mapperV.SetUseLookupTableScalarRange(1)
         actorV = vtk.vtkActor()
@@ -178,7 +192,7 @@ class FluxViz(object):
         ren.AddActor(cbar)
         ren.AddActor(xAxis)
         ren.AddActor(yAxis)
-        ren.SetBackground((0.7, 0.7, 0.7))
+        ren.SetBackground((0.1, 0.1, 0.1))
         renWin.SetSize(1260, 960)
         renWin.SetWindowName('Vertically integrated edge flux')
 
