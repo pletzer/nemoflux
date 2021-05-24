@@ -99,18 +99,22 @@ class DataGen(object):
                     p1 = numpy.array((x1, y1, 0.))
                     p2 = numpy.array((x2, y2, 0.))
                     p3 = numpy.array((x3, y3, 0.))
+                    dPhi21 = self.potential[k, j, i, 2] - self.potential[k, j, i, 1]
+                    dPhi23 = self.potential[k, j, i, 2] - self.potential[k, j, i, 3]
+                    ds21 = geo.getArcLength(p2, p1, radius=geo.EARTH_RADIUS)
+                    ds23 = geo.getArcLength(p2, p3, radius=geo.EARTH_RADIUS)
                     # east, - d phi/ dy
-                    self.u[k, j, i] = -(self.potential[k, j, i, 2] - self.potential[k, j, i, 1]) / geo.getArcLength(p2, p1, radius=geo.EARTH_RADIUS)
+                    self.u[k, j, i] = - dPhi21 / ds21
                     # north, + d phi/ dx
-                    self.v[k, j, i] = +(self.potential[k, j, i, 2] - self.potential[k, j, i, 3]) / geo.getArcLength(p2, p3, radius=geo.EARTH_RADIUS)
+                    self.v[k, j, i] = + dPhi23 / ds23
 
-    def rotatePole(self, deltaLonDeg=0., deltaLatDeg=0.):
+    def rotatePole(self, deltaDeg=(0., 0.)):
 
         lats = numpy.zeros((self.ny, self.nx,), numpy.float64)
         lons = numpy.zeros((self.ny, self.nx,), numpy.float64)
 
-        alpha = numpy.pi * deltaLatDeg / 180.
-        beta = numpy.pi * deltaLonDeg / 180.
+        alpha = numpy.pi * deltaDeg[1] / 180.
+        beta = numpy.pi * deltaDeg[0] / 180.
         cos_alp = numpy.cos(alpha)
         sin_alp = numpy.sin(alpha)
         cos_bet = numpy.cos(beta)
@@ -250,23 +254,29 @@ class DataGen(object):
 
 
 def main(*, potentialFunction: str="y", prefix: str, 
-            xmin: float=0.0, xmax: float=360., ymin: float=-90., ymax: float=90., 
-            nx: int=10, ny: int=4, nz: int=3, deltaLonDeg: float=0., deltaLatDeg: float=0.):
+            xmin: float=0.0, xmax: float=360., 
+            ymin: float=-90., ymax: float=90.,
+            zmin: float=0., zmax: float=1.0,
+            nx: int=10, ny: int=4, nz: int=5, deltaDeg: str="(0.,0.)"):
     """Generate data
+    :param potentialFunction: potential expression of x and y
     :param prefix: file prefix
     :param xmin: min longitude
     :param xmax: max longitude
     :param ymin: min latitude
     :param ymax: max latitude
+    :param zmin: min depth
+    :param zmax: max depth
     :param nx: number of cells in longitude
     :param ny: number of cells in latitude
-    :param potentialFunction: potential expression of x and y
+    :param nz: number of vertical cells
+    :param deltaDeg: longitude, latitude pole displacement 
     """
     lldg = DataGen(prefix)
     lldg.setSizes(nx, ny, nz)
     lldg.setBoundingBox(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, zmin=0., zmax=1.)
     lldg.build()
-    lldg.rotatePole(deltaLonDeg=deltaLonDeg, deltaLatDeg=deltaLatDeg)
+    lldg.rotatePole(deltaDeg=eval(deltaDeg))
     lldg.applyPotential(potentialFunction)
     lldg.computeUVFromPotential()
     lldg.save()
