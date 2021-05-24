@@ -44,6 +44,15 @@ class HorizGrid(object):
         self.grid.computeEdgeArcLengths()
         self.grid.attach('cellAreas', self.cellAreas)
 
+    def getMintGrid(self):
+        return self.grid
+
+    def getNumCells(self):
+        return self.grid.getNumberOfCells()
+
+    def getPoint(self, cellId, vertex):
+        return self.points[cellId, vertex, :]
+
     def dump(self, fileName):
         """Dump the grid data to a VTK file
 

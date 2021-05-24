@@ -249,7 +249,7 @@ class DataGen(object):
         ncV.close()
 
 
-def main(*, potentialFunction: str="(1. - z/zmax)*y*2*pi*A/360.", prefix: str, 
+def main(*, potentialFunction: str="y", prefix: str, 
             xmin: float=0.0, xmax: float=360., ymin: float=-90., ymax: float=90., 
             nx: int=10, ny: int=4, nz: int=3, deltaLonDeg: float=0., deltaLatDeg: float=0.):
     """Generate data

@@ -1,66 +1,81 @@
 import mint
 import numpy
 import netCDF4
-from grid import Grid
+from horizgrid import HorizGrid
+import geo
 import defopt
 
 class FluxCalc(object):
 
     def __init__(self, tFile, uFile, vFile, targetPoints):
 
-        self.gr = Grid(tFile)
+        self.gr = HorizGrid(tFile)
         self.pli = mint.PolylineIntegral()
         self.pli.build(self.gr.getMintGrid(), targetPoints,
                        counterclock=False, periodX=360.0)
 
-        ncU = netCDF4.Dataset(uFile)
-        uo = ncU.variables['uo'][:]
-        ncU.close()
+        with netCDF4.Dataset(tFile) as nc:
+            depth_half = nc.variables['deptht'][:]
+            bounds_depth = nc.variables['deptht_bounds'][:]
+
+        with netCDF4.Dataset(uFile) as nc:
+            uo = nc.variables['uo'][:]
         # set the velocity to zero where missing
         uo = numpy.ma.filled(uo, 0.0)
 
-        ncV = netCDF4.Dataset(vFile)
-        vo = ncV.variables['vo'][:]
-        ncV.close()
+        with netCDF4.Dataset(vFile) as nc:
+            vo = nc.variables['vo'][:]
         # set the velocity to zero where missing
         vo = numpy.ma.filled(vo, 0.0)
        
         nz, ny, nx = uo.shape
 
         numCells = self.gr.getNumCells()
-        self.integratedVelocity = numpy.zeros((nz, numCells, 4), numpy.float64)
+        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
 
-        for k in range(nz):
-            cellId = 0
-            for j in range(ny):
-                for i in range(nx):
+        cellId = 0
+        for j in range(ny):
+            for i in range(nx):
 
-                    x0, y0, _ = self.gr.getPoint(cellId, 0)
-                    x1, y1, _ = self.gr.getPoint(cellId, 1)
-                    x2, y2, _ = self.gr.getPoint(cellId, 2)
-                    x3, y3, _ = self.gr.getPoint(cellId, 3)
+                p0 = self.gr.getPoint(cellId, 0)
+                p1 = self.gr.getPoint(cellId, 1)
+                p2 = self.gr.getPoint(cellId, 2)
+                p3 = self.gr.getPoint(cellId, 3)
 
-                    # NEED TO USE ds IN METRES (TO CHANGE)
+                ds01 = geo.getArcLength(p0, p1, radius=geo.EARTH_RADIUS)
+                ds12 = geo.getArcLength(p1, p2, radius=geo.EARTH_RADIUS)
+                ds32 = geo.getArcLength(p3, p2, radius=geo.EARTH_RADIUS)
+                ds03 = geo.getArcLength(p0, p3, radius=geo.EARTH_RADIUS)
+
+                # integrate vertically
+                for k in range(nz):
+
+                    dz = -(bounds_depth[k, 1] - bounds_depth[k, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+
+                    #        ^
+                    #        |
+                    #  3-----V-----2
+                    #  |           |
+                    #  |->   T     U->
+                    #  |     ^     |
+                    #  |     |     |
+                    #  0-----------1
 
                     # south
-                    ds = numpy.sqrt((x1 - x0)**2 + (y1 - y0)**2)
-                    if j >= 1:
-                        ds = self.gr.getEdgeArcLength(cellId, 0)
-                        self.integratedVelocity[k, cellId, 0] = vo[k, j - 1, i] * ds
+                    if i > 0:
+                        self.integratedVelocity[cellId, 0] += vo[k, j-1, i+0] * ds01 * dz
 
                     # east
-                    ds = self.gr.getEdgeArcLength(cellId, 1)
-                    self.integratedVelocity[k, cellId, 1] = uo[k, j, i] * ds
+                    self.integratedVelocity[cellId, 1] += uo[k, j+0, i+0] * ds12 * dz
 
                     # north
-                    ds = self.gr.getEdgeArcLength(cellId, 2)
-                    self.integratedVelocity[k, cellId, 2] = vo[k, j, i] * ds
+                    self.integratedVelocity[cellId, 2] += vo[k, j+0, i+0] * ds32 * dz
 
-                    # west, periodic boundary
-                    ds = self.gr.getEdgeArcLength(cellId, 3)
-                    self.integratedVelocity[k, cellId , 3] = uo[k, j, i - 1] * ds
+                    # west
+                    if j > 0:
+                        self.integratedVelocity[cellId, 3] += uo[k, j+0, i-1] * ds03 * dz
 
-                    cellId += 1
+                cellId += 1
 
     def getFlux(self):
         return self.pli.getIntegral(self.integratedVelocity)
@@ -73,8 +88,8 @@ def main(*, tFile: str, uFile: str, vFile: str, xyStr: str):
     :param xyStr: array of target points
     """
     xyVals = numpy.array(eval(xyStr))
-    numPoints = xyVals.shape[0]
-    targetPoints = numpy.zeros((numPoints, 3), numpy.float64)
+    numTargetPoints = xyVals.shape[0]
+    targetPoints = numpy.zeros((numTargetPoints, 3), numpy.float64)
     targetPoints[:, :2] = xyVals
     fc = FluxCalc(tFile, uFile, vFile, targetPoints)
     print(f'flux: {fc.getFlux()}')
