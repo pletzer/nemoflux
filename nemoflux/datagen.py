@@ -49,23 +49,23 @@ class DataGen(object):
 
         x = numpy.array([self.xmin + i*dx for i in range(self.nx + 1)])
         y = numpy.array([self.ymin + j*dx for j in range(self.ny + 1)])
-        xx, yy = numpy.meshgrid(x, y, indexing='xy')
+        self.xx, self.yy = numpy.meshgrid(x, y, indexing='xy')
 
         # cell bounds
         self.bounds_lon = numpy.zeros((self.ny, self.nx, 4), REAL)
         self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), REAL)
 
-        self.bounds_lon[..., 0] = xx[:-1, :-1]
-        self.bounds_lon[..., 1] = xx[:-1, 1:]
-        self.bounds_lon[..., 2] = xx[1:, 1:]
-        self.bounds_lon[..., 3] = xx[1:, :-1]
-        self.bounds_lat[..., 0] = yy[:-1, :-1]
-        self.bounds_lat[..., 1] = yy[:-1, 1:]
-        self.bounds_lat[..., 2] = yy[1:, 1:]
-        self.bounds_lat[..., 3] = yy[1:, :-1]
+        self.bounds_lon[..., 0] = self.xx[:-1, :-1]
+        self.bounds_lon[..., 1] = self.xx[:-1, 1:]
+        self.bounds_lon[..., 2] = self.xx[1:, 1:]
+        self.bounds_lon[..., 3] = self.xx[1:, :-1]
+        self.bounds_lat[..., 0] = self.yy[:-1, :-1]
+        self.bounds_lat[..., 1] = self.yy[:-1, 1:]
+        self.bounds_lat[..., 2] = self.yy[1:, 1:]
+        self.bounds_lat[..., 3] = self.yy[1:, :-1]
 
-        self.nav_lon = 0.25*(xx[:-1, :-1] + xx[:-1, 1:] + xx[1:, 1:] + xx[1:, :-1])     
-        self.nav_lat = 0.25*(yy[:-1, :-1] + yy[:-1, 1:] + yy[1:, 1:] + yy[1:, :-1])     
+        self.nav_lon = 0.25*(self.xx[:-1, :-1] + self.xx[:-1, 1:] + self.xx[1:, 1:] + self.xx[1:, :-1])     
+        self.nav_lat = 0.25*(self.yy[:-1, :-1] + self.yy[:-1, 1:] + self.yy[1:, 1:] + self.yy[1:, :-1])     
 
     def applyPotential(self, potentialFunction):
         zmin, zmax = self.zmin, self.zmax
@@ -73,12 +73,12 @@ class DataGen(object):
         A = geo.EARTH_RADIUS
         for k in range(self.nz):
             z = self.zhalf[k]
-            for j in range(self.ny):
-                for i in range(self.nx):
-                    for vertex in range(4):
-                        y = self.bounds_lat[j, i, vertex]
-                        x = self.bounds_lon[j, i, vertex]
-                        self.potential[k, j, i, vertex] = eval(potentialFunction)
+            x, y = self.xx, self.yy
+            pot = eval(potentialFunction)
+            self.potential[k, ..., 0] = pot[:-1, :-1]
+            self.potential[k, ..., 1] = pot[:-1, 1:]
+            self.potential[k, ..., 2] = pot[1:, 1:]
+            self.potential[k, ..., 3] = pot[1:, :-1]
 
     def computeUVFromPotential(self):
         self.u = numpy.zeros((self.nz, self.ny, self.nx), numpy.float64)
