@@ -32,6 +32,9 @@ class HorizGrid(object):
     def getNumCells(self):
         return self.grid.getNumberOfCells()
 
+    def getPoints(self):
+        return self.points
+
     def getPoint(self, cellId, vertex):
         return self.points[cellId, vertex, :]
 

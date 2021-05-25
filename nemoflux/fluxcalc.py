@@ -6,6 +6,15 @@ import geo
 import defopt
 
 
+DEG2RAD = numpy.pi/180.
+
+def lonLat2XYZ(p, radius):
+    rho = radius*numpy.cos(p[1]*DEG2RAD)
+    return  numpy.array([rho*numpy.cos(p[0]*DEG2RAD), 
+                         rho*numpy.sin(p[0]*DEG2RAD), 
+                         radius*numpy.sin(p[1]*DEG2RAD)])
+
+
 class FluxCalc(object):
 
     def __init__(self, tFile, uFile, vFile, targetPoints):
@@ -32,26 +41,28 @@ class FluxCalc(object):
         nz, ny, nx = uo.shape
 
         numCells = self.gr.getNumCells()
-        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
 
         # integrate vertically, multiplying by the thickness of the layers
         dz = -(bounds_depth[:, 1] - bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
         uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
         vo = numpy.tensordot(dz, vo, axes=(0, 0))
 
+        points = self.gr.getPoints()
+
+        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
         cellId = 0
         for j in range(ny):
             for i in range(nx):
 
-                p0 = self.gr.getPoint(cellId, 0)
-                p1 = self.gr.getPoint(cellId, 1)
-                p2 = self.gr.getPoint(cellId, 2)
-                p3 = self.gr.getPoint(cellId, 3)
+                xyz0 = lonLat2XYZ(points[cellId, 0], radius=geo.EARTH_RADIUS)
+                xyz1 = lonLat2XYZ(points[cellId, 1], radius=geo.EARTH_RADIUS)
+                xyz2 = lonLat2XYZ(points[cellId, 2], radius=geo.EARTH_RADIUS)
+                xyz3 = lonLat2XYZ(points[cellId, 3], radius=geo.EARTH_RADIUS)
 
-                ds01 = geo.getArcLength(p0, p1, radius=geo.EARTH_RADIUS)
-                ds12 = geo.getArcLength(p1, p2, radius=geo.EARTH_RADIUS)
-                ds32 = geo.getArcLength(p3, p2, radius=geo.EARTH_RADIUS)
-                ds03 = geo.getArcLength(p0, p3, radius=geo.EARTH_RADIUS)
+                ds01 = geo.getArcLength(xyz0, xyz1, radius=geo.EARTH_RADIUS)
+                ds12 = geo.getArcLength(xyz1, xyz2, radius=geo.EARTH_RADIUS)
+                ds32 = geo.getArcLength(xyz3, xyz2, radius=geo.EARTH_RADIUS)
+                ds03 = geo.getArcLength(xyz0, xyz3, radius=geo.EARTH_RADIUS)
 
                 # integrate vertically
 
