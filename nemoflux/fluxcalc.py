@@ -9,10 +9,12 @@ import defopt
 DEG2RAD = numpy.pi/180.
 
 def lonLat2XYZ(p, radius):
-    rho = radius*numpy.cos(p[1]*DEG2RAD)
-    return  numpy.array([rho*numpy.cos(p[0]*DEG2RAD), 
-                         rho*numpy.sin(p[0]*DEG2RAD), 
-                         radius*numpy.sin(p[1]*DEG2RAD)])
+    lam = p[0]*DEG2RAD
+    the = p[1]*DEG2RAD
+    rho = radius*numpy.cos(the)
+    return  numpy.array([rho*numpy.cos(lam), 
+                         rho*numpy.sin(lam), 
+                         radius*numpy.sin(the)])
 
 
 class FluxCalc(object):
@@ -47,17 +49,17 @@ class FluxCalc(object):
         uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
         vo = numpy.tensordot(dz, vo, axes=(0, 0))
 
-        points = self.gr.getPoints()
+        points = self.gr.getPoints().reshape((ny, nx, 4, 3))
 
-        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
+        self.integratedVelocity = numpy.zeros((ny, nx, 4), numpy.float64)
         cellId = 0
         for j in range(ny):
             for i in range(nx):
 
-                xyz0 = lonLat2XYZ(points[cellId, 0], radius=geo.EARTH_RADIUS)
-                xyz1 = lonLat2XYZ(points[cellId, 1], radius=geo.EARTH_RADIUS)
-                xyz2 = lonLat2XYZ(points[cellId, 2], radius=geo.EARTH_RADIUS)
-                xyz3 = lonLat2XYZ(points[cellId, 3], radius=geo.EARTH_RADIUS)
+                xyz0 = lonLat2XYZ(points[j, i, 0, :], radius=geo.EARTH_RADIUS)
+                xyz1 = lonLat2XYZ(points[j, i, 1, :], radius=geo.EARTH_RADIUS)
+                xyz2 = lonLat2XYZ(points[j, i, 2, :], radius=geo.EARTH_RADIUS)
+                xyz3 = lonLat2XYZ(points[j, i, 3, :], radius=geo.EARTH_RADIUS)
 
                 ds01 = geo.getArcLength(xyz0, xyz1, radius=geo.EARTH_RADIUS)
                 ds12 = geo.getArcLength(xyz1, xyz2, radius=geo.EARTH_RADIUS)
@@ -77,21 +79,23 @@ class FluxCalc(object):
 
                 # south
                 if j > 0:
-                    self.integratedVelocity[cellId, 0] = vo[j-1, i+0] * ds01
+                    self.integratedVelocity[j, i, 0] = vo[j-1, i+0] * ds01
                 # else:
                 #     # folding, assuming even nx
                 #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
 
                 # east
-                self.integratedVelocity[cellId, 1] = uo[j+0, i+0] * ds12
+                self.integratedVelocity[j, i, 1] = uo[j+0, i+0] * ds12
 
                 # north
-                self.integratedVelocity[cellId, 2] = vo[j+0, i+0] * ds32
+                self.integratedVelocity[j, i, 2] = vo[j+0, i+0] * ds32
 
                 # periodic west
-                self.integratedVelocity[cellId, 3] = uo[j+0, (i-1)%nx] * ds03
+                self.integratedVelocity[j, i, 3] = uo[j+0, (i-1)%nx] * ds03
 
                 cellId += 1
+
+        self.integratedVelocity = self.integratedVelocity.reshape((numCells, 4))
 
 
     def getFlux(self):
