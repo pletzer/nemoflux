@@ -67,45 +67,38 @@ class FluxCalc(object):
         xyz3 = lonLat2XYZArray(points[:, :, 3, :], radius=geo.EARTH_RADIUS)
         print(xyz0.shape, xyz1.shape, xyz2.shape, xyz3.shape)
 
+        ds01 = geo.getArcLengthArray(xyz0, xyz1, radius=geo.EARTH_RADIUS)
+        ds12 = geo.getArcLengthArray(xyz1, xyz2, radius=geo.EARTH_RADIUS)
+        ds32 = geo.getArcLengthArray(xyz3, xyz2, radius=geo.EARTH_RADIUS)
+        ds03 = geo.getArcLengthArray(xyz0, xyz3, radius=geo.EARTH_RADIUS)
+
         self.integratedVelocity = numpy.zeros((ny, nx, 4), numpy.float64)
-        cellId = 0
-        for j in range(ny):
-            for i in range(nx):
+        #        ^
+        #        |
+        #  3-----V-----2
+        #  |           |
+        #  |->   T     U->
+        #  |     ^     |
+        #  |     |     |
+        #  0-----------1
 
-                ds01 = geo.getArcLength(xyz0[j, i, :], xyz1[j, i, :], radius=geo.EARTH_RADIUS)
-                ds12 = geo.getArcLength(xyz1[j, i, :], xyz2[j, i, :], radius=geo.EARTH_RADIUS)
-                ds32 = geo.getArcLength(xyz3[j, i, :], xyz2[j, i, :], radius=geo.EARTH_RADIUS)
-                ds03 = geo.getArcLength(xyz0[j, i, :], xyz3[j, i, :], radius=geo.EARTH_RADIUS)
+        # south
+        self.integratedVelocity[1:, :, 0] = vo[:-1, :] * ds01[:-1, :]
+        # else:
+        #     # folding, assuming even nx
+        #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
 
-                # integrate vertically
+        # east
+        self.integratedVelocity[..., 1] = uo * ds12
 
-                #        ^
-                #        |
-                #  3-----V-----2
-                #  |           |
-                #  |->   T     U->
-                #  |     ^     |
-                #  |     |     |
-                #  0-----------1
+        # north
+        self.integratedVelocity[..., 2] = vo * ds32
 
-                # south
-                if j > 0:
-                    self.integratedVelocity[j, i, 0] = vo[j-1, i+0] * ds01
-                # else:
-                #     # folding, assuming even nx
-                #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
+        # periodic west
+        self.integratedVelocity[:, 1:, 3] = uo[:, :-1] * ds03[:, :-1]
+        self.integratedVelocity[:, 0, 3] = uo[:, -1] * ds03[:, -1]
 
-                # east
-                self.integratedVelocity[j, i, 1] = uo[j+0, i+0] * ds12
-
-                # north
-                self.integratedVelocity[j, i, 2] = vo[j+0, i+0] * ds32
-
-                # periodic west
-                self.integratedVelocity[j, i, 3] = uo[j+0, (i-1)%nx] * ds03
-
-                cellId += 1
-
+        # array should have shape (numCells, 4)
         self.integratedVelocity = self.integratedVelocity.reshape((numCells, 4))
 
 
