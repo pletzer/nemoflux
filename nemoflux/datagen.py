@@ -83,23 +83,29 @@ class DataGen(object):
     def computeUVFromPotential(self):
         self.u = numpy.zeros((self.nz, self.ny, self.nx), numpy.float64)
         self.v = numpy.zeros((self.nz, self.ny, self.nx), numpy.float64)
+
+        pp1 = numpy.zeros((self.ny, self.nx, 3), numpy.float64)
+        pp2 = numpy.zeros((self.ny, self.nx, 3), numpy.float64)
+        pp3 = numpy.zeros((self.ny, self.nx, 3), numpy.float64)
+        pp1[..., 0] = self.xx[:-1, 1:]
+        pp1[..., 1] = self.yy[:-1, 1:]
+        pp2[..., 0] = self.xx[1:, 1:]
+        pp2[..., 1] = self.yy[1:, 1:]
+        pp3[..., 0] = self.xx[1:, :-1]
+        pp3[..., 1] = self.yy[1:, :-1]
+        xyz1 = geo.lonLat2XYZArray(pp1, radius=geo.EARTH_RADIUS)
+        xyz2 = geo.lonLat2XYZArray(pp2, radius=geo.EARTH_RADIUS)
+        xyz3 = geo.lonLat2XYZArray(pp3, radius=geo.EARTH_RADIUS)
+
         for k in range(self.nz):
-            for j in range(self.ny):
-                for i in range(self.nx):
-                    x0, x1, x2, x3 = self.bounds_lon[j, i, :]
-                    y0, y1, y2, y3 = self.bounds_lat[j, i, :]
-                    p0 = numpy.array((x0, y0, 0.))
-                    p1 = numpy.array((x1, y1, 0.))
-                    p2 = numpy.array((x2, y2, 0.))
-                    p3 = numpy.array((x3, y3, 0.))
-                    dPhi21 = self.potential[k, j, i, 2] - self.potential[k, j, i, 1]
-                    dPhi23 = self.potential[k, j, i, 2] - self.potential[k, j, i, 3]
-                    ds21 = geo.getArcLength(p2, p1, radius=geo.EARTH_RADIUS)
-                    ds23 = geo.getArcLength(p2, p3, radius=geo.EARTH_RADIUS)
-                    # east, - d phi/ dy
-                    self.u[k, j, i] = - dPhi21 / ds21
-                    # north, + d phi/ dx
-                    self.v[k, j, i] = + dPhi23 / ds23
+            dPhi21 = self.potential[k, ..., 2] - self.potential[k, ..., 1]
+            dPhi23 = self.potential[k, ..., 2] - self.potential[k, ..., 3]
+            ds21 = geo.getArcLengthArray(xyz2, xyz1, radius=geo.EARTH_RADIUS)
+            ds23 = geo.getArcLengthArray(xyz2, xyz3, radius=geo.EARTH_RADIUS)
+            # east, - d phi/ dy
+            self.u[k, :, :] = - dPhi21 / ds21
+            # north, + d phi/ dx, avoid pole
+            self.v[k, :-1, :] = + dPhi23[:-1, :] / ds23[:-1, :]
 
     def rotatePole(self, deltaDeg=(0., 0.)):
 
