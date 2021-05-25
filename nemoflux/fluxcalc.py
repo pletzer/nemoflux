@@ -6,27 +6,6 @@ import geo
 import defopt
 
 
-DEG2RAD = numpy.pi/180.
-
-def lonLat2XYZ(p, radius):
-    lam = p[0]*DEG2RAD
-    the = p[1]*DEG2RAD
-    rho = radius*numpy.cos(the)
-    return  numpy.array([rho*numpy.cos(lam), 
-                         rho*numpy.sin(lam), 
-                         radius*numpy.sin(the)])
-
-def lonLat2XYZArray(p, radius):
-    lam = p[...,0]*DEG2RAD
-    the = p[...,1]*DEG2RAD
-    rho = radius*numpy.cos(the)
-    xyz = numpy.zeros(p.shape, numpy.float64)
-    xyz[..., 0] = rho*numpy.cos(lam) # x
-    xyz[..., 1] = rho*numpy.sin(lam) # y
-    xyz[..., 2] = radius*numpy.sin(the) # z
-    return xyz
-
-
 class FluxCalc(object):
 
     def __init__(self, tFile, uFile, vFile, targetPoints):
@@ -61,11 +40,10 @@ class FluxCalc(object):
 
         points = self.gr.getPoints().reshape((ny, nx, 4, 3))
 
-        xyz0 = lonLat2XYZArray(points[:, :, 0, :], radius=geo.EARTH_RADIUS)
-        xyz1 = lonLat2XYZArray(points[:, :, 1, :], radius=geo.EARTH_RADIUS)
-        xyz2 = lonLat2XYZArray(points[:, :, 2, :], radius=geo.EARTH_RADIUS)
-        xyz3 = lonLat2XYZArray(points[:, :, 3, :], radius=geo.EARTH_RADIUS)
-        print(xyz0.shape, xyz1.shape, xyz2.shape, xyz3.shape)
+        xyz0 = geo.lonLat2XYZArray(points[:, :, 0, :], radius=geo.EARTH_RADIUS)
+        xyz1 = geo.lonLat2XYZArray(points[:, :, 1, :], radius=geo.EARTH_RADIUS)
+        xyz2 = geo.lonLat2XYZArray(points[:, :, 2, :], radius=geo.EARTH_RADIUS)
+        xyz3 = geo.lonLat2XYZArray(points[:, :, 3, :], radius=geo.EARTH_RADIUS)
 
         ds01 = geo.getArcLengthArray(xyz0, xyz1, radius=geo.EARTH_RADIUS)
         ds12 = geo.getArcLengthArray(xyz1, xyz2, radius=geo.EARTH_RADIUS)
