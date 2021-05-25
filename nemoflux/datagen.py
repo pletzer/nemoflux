@@ -46,33 +46,26 @@ class DataGen(object):
         self.nav_lat = numpy.zeros((self.ny, self.nx), REAL)
         self.nav_lon = numpy.zeros((self.ny, self.nx), REAL)
 
+
+        x = numpy.array([self.xmin + i*dx for i in range(self.nx + 1)])
+        y = numpy.array([self.ymin + j*dx for j in range(self.ny + 1)])
+        xx, yy = numpy.meshgrid(x, y, indexing='xy')
+
         # cell bounds
-        self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), REAL)
         self.bounds_lon = numpy.zeros((self.ny, self.nx, 4), REAL)
+        self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), REAL)
 
-        # iterate over the horizontal cells
-        for j in range(self.ny):
-            y0 = self.ymin + j*dy
-            y1 = y0 + dy
-            ym = y0 + 0.5*dy
-            for i in range(self.nx):
-                x0 = self.xmin + i*dx
-                x1 = x0 + dx
-                xm = x0 + 0.5*dx
+        self.bounds_lon[..., 0] = xx[:-1, :-1]
+        self.bounds_lon[..., 1] = xx[:-1, 1:]
+        self.bounds_lon[..., 2] = xx[1:, 1:]
+        self.bounds_lon[..., 3] = xx[1:, :-1]
+        self.bounds_lat[..., 0] = yy[:-1, :-1]
+        self.bounds_lat[..., 1] = yy[:-1, 1:]
+        self.bounds_lat[..., 2] = yy[1:, 1:]
+        self.bounds_lat[..., 3] = yy[1:, :-1]
 
-                self.bounds_lat[j, i, 0] = y0
-                self.bounds_lat[j, i, 1] = y0
-                self.bounds_lat[j, i, 2] = y1
-                self.bounds_lat[j, i, 3] = y1
-
-                self.bounds_lon[j, i, 0] = x0
-                self.bounds_lon[j, i, 1] = x1
-                self.bounds_lon[j, i, 2] = x1
-                self.bounds_lon[j, i, 3] = x0
-
-                # cell mid point
-                self.nav_lat[j, i] = ym
-                self.nav_lon[j, i] = xm
+        self.nav_lon = 0.25*(xx[:-1, :-1] + xx[:-1, 1:] + xx[1:, 1:] + xx[1:, :-1])     
+        self.nav_lat = 0.25*(yy[:-1, :-1] + yy[:-1, 1:] + yy[1:, 1:] + yy[1:, :-1])     
 
     def applyPotential(self, potentialFunction):
         zmin, zmax = self.zmin, self.zmax
