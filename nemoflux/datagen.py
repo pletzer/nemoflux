@@ -33,20 +33,19 @@ class DataGen(object):
 
     def buildScaledVertical(self):
         #  non-uniform depth
-        self.zhalf = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0.5)/float(self.nz))**2 for k in range(self.nz)])
-        self.ztop  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0  )/float(self.nz))**2 for k in range(self.nz)])
-        self.zbot  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 1  )/float(self.nz))**2 for k in range(self.nz)])
+        # self.zhalf = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0.5)/float(self.nz))**2 for k in range(self.nz)])
+        # self.ztop  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0  )/float(self.nz))**2 for k in range(self.nz)])
+        # self.zbot  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 1  )/float(self.nz))**2 for k in range(self.nz)])
+        self.zhalf = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0.5)/float(self.nz)) for k in range(self.nz)])
+        self.ztop  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0  )/float(self.nz)) for k in range(self.nz)])
+        self.zbot  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 1  )/float(self.nz)) for k in range(self.nz)])
 
     def buildUniformHorizontal(self):
 
         ny1, nx1 = self.ny + 1, self.nx + 1
         dy, dx = (self.ymax - self.ymin)/float(self.ny), (self.xmax - self.xmin)/float(self.nx)
 
-        # cell centres
-        self.nav_lat = numpy.zeros((self.ny, self.nx), REAL)
-        self.nav_lon = numpy.zeros((self.ny, self.nx), REAL)
-
-
+        # xx and yy are the lon and lats
         x = numpy.array([self.xmin + i*dx for i in range(self.nx + 1)])
         y = numpy.array([self.ymin + j*dx for j in range(self.ny + 1)])
         self.xx, self.yy = numpy.meshgrid(x, y, indexing='xy')
@@ -64,8 +63,6 @@ class DataGen(object):
         self.bounds_lat[..., 2] = self.yy[1:, 1:]
         self.bounds_lat[..., 3] = self.yy[1:, :-1]
 
-        self.nav_lon = 0.25*(self.xx[:-1, :-1] + self.xx[:-1, 1:] + self.xx[1:, 1:] + self.xx[1:, :-1])     
-        self.nav_lat = 0.25*(self.yy[:-1, :-1] + self.yy[:-1, 1:] + self.yy[1:, 1:] + self.yy[1:, :-1])     
 
     def applyPotential(self, potentialFunction):
         zmin, zmax = self.zmin, self.zmax
@@ -135,22 +132,6 @@ class DataGen(object):
 
         for j in range(self.ny):
             for i in range(self.nx):
-                the = numpy.pi * self.nav_lat[j, i] / 180.
-                lam = numpy.pi * self.nav_lon[j, i] / 180.
-                cos_the = numpy.cos(the)
-                sin_the = numpy.sin(the)
-                rho = cos_the
-                cos_lam = numpy.cos(lam)
-                sin_lam = numpy.sin(lam)
-
-                xyz0 = rho * cos_lam, rho * sin_lam, sin_the
-                xyz1 = numpy.dot(transfMatrix, xyz0)
-
-                self.nav_lat[j, i] = 180. * math.asin(xyz1[2]) / pi
-                self.nav_lon[j, i] = 180. * math.atan2(xyz1[1], xyz1[0]) / pi
-                # use the convention 0 <= lon < 360
-                self.nav_lon[j, i] %= 360.
-
                 for vertex in range(4):
                     the = numpy.pi * self.bounds_lat[j, i, vertex] / 180.
                     lam = numpy.pi * self.bounds_lon[j, i, vertex] / 180.
@@ -160,18 +141,18 @@ class DataGen(object):
                     cos_lam = numpy.cos(lam)
                     sin_lam = numpy.sin(lam)
 
-                    xyz0 = rho * cos_lam, rho * sin_lam, sin_the
-                    xyz1 = numpy.dot(transfMatrix, xyz0)
+                    xyzOld = rho * cos_lam, rho * sin_lam, sin_the
+                    xyzNew = numpy.dot(transfMatrix, xyz0)
 
-                    self.bounds_lat[j, i, vertex] = 180. * math.asin(xyz1[2]) / numpy.pi
-                    self.bounds_lon[j, i, vertex] = 180. * math.atan2(xyz1[1], xyz1[0]) / numpy.pi
+                    self.bounds_lat[j, i, vertex] = 180. * math.asin(xyzNew[2]) / numpy.pi
+                    self.bounds_lon[j, i, vertex] = 180. * math.atan2(xyzNew[1], xyzNew[0]) / numpy.pi
                     # use the convention 0 <= lon < 360
                     # self.bounds_lon[j, i, vertex] %= 360.
 
                     # date line fix
-                    if self.bounds_lon[j, i, vertex] - self.nav_lon[j, i] > 270.:
+                    if self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] > 270.:
                         self.bounds_lon[j, i, vertex] -= 360.
-                    if self.bounds_lon[j, i, vertex] - self.nav_lon[j, i] < -270.:
+                    if self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] < -270.:
                         self.bounds_lon[j, i, vertex] += 360.
 
     def save(self):
@@ -190,16 +171,6 @@ class DataGen(object):
         deptht_bounds = ncT.createVariable('deptht_bounds', REAL, ('z', 'axis_nbounds'))
         deptht_bounds[:, 0] = self.ztop
         deptht_bounds[:, 1] = self.zbot
-
-        nav_lat = ncT.createVariable('nav_lat', REAL, ('y', 'x'))
-        nav_lat.standard_name = 'latitude'
-        nav_lat.bounds = 'bounds_lat'
-        nav_lat[:] = self.nav_lat
-
-        nav_lon = ncT.createVariable('nv_lon', REAL, ('y', 'x'))
-        nav_lon.standard_name = 'longitude'
-        nav_lon.bounds = 'bounds_lon'
-        nav_lon[:] = self.nav_lon
 
         bounds_lat = ncT.createVariable('bounds_lat', REAL, ('y', 'x', 'nvertex'))
         bounds_lat[:] = self.bounds_lat
