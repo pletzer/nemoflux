@@ -9,13 +9,10 @@ class HorizGrid(object):
 
     def __init__(self, tFile):
     
-        nc = netCDF4.Dataset(tFile)
-        # read the cell bounds
-        bounds_lat = nc.variables['bounds_lat'][:]
-        bounds_lon = nc.variables['bounds_lon'][:]
-        # read the potential values
-        potential = nc.variables['potential'][:]
-        nc.close()
+        with netCDF4.Dataset(tFile) as nc:
+            # read the cell bounds
+            bounds_lat = nc.variables['bounds_lat'][:]
+            bounds_lon = nc.variables['bounds_lon'][:]
 
         ny, nx, nvertex = bounds_lat.shape
         numCells = ny * nx

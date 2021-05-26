@@ -31,15 +31,20 @@ class FluxViz(object):
         numCells = ny * nx
         self.ny, self.nx = ny, nx
 
+        # integrate vertically, multiplying by the thickness of the layers
+        dz = -(bounds_depth[:, 1] - bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+        uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
+        vo = numpy.tensordot(dz, vo, axes=(0, 0))
+
         # points, 4 points per cell, 3D
-        self.xyz = numpy.zeros((ny, nx, 4, 3), numpy.float64)
-        self.xyz[..., 0] = bounds_lon
-        self.xyz[..., 1] = bounds_lat
+        self.lonlat = numpy.zeros((ny, nx, 4, 3), numpy.float64)
+        self.lonlat[..., 0] = bounds_lon
+        self.lonlat[..., 1] = bounds_lat
 
         self.pointData = vtk.vtkDoubleArray()
         self.pointData.SetNumberOfComponents(3)
         self.pointData.SetNumberOfTuples(4 * numCells)
-        self.pointData.SetVoidArray(self.xyz, 4 * numCells * 3, 1)
+        self.pointData.SetVoidArray(self.lonlat, 4 * numCells * 3, 1)
 
         self.points = vtk.vtkPoints()
         self.points.SetData(self.pointData)
@@ -94,32 +99,26 @@ class FluxViz(object):
                 #  |           |
                 #  0-----------1
 
-
-                ptIds.SetId(0, 4*cellId + 1); ptIds.SetId(1, 4*cellId + 2)
+                ptIds.SetId(0, 4*cellId + 1)
+                ptIds.SetId(1, 4*cellId + 2)
                 self.gridU.InsertNextCell(vtk.VTK_LINE, ptIds)
 
-                ptIds.SetId(0, 4*cellId + 3); ptIds.SetId(1, 4*cellId + 2)
+                ptIds.SetId(0, 4*cellId + 3)
+                ptIds.SetId(1, 4*cellId + 2)
                 self.gridV.InsertNextCell(vtk.VTK_LINE, ptIds)
 
-                p1[:] = self.xyz[j, i, 1, :]
-                p2[:] = self.xyz[j, i, 2, :]
-                p3[:] = self.xyz[j, i, 3, :]
+                p1[:] = self.lonlat[j, i, 1, :]
+                p2[:] = self.lonlat[j, i, 2, :]
+                p3[:] = self.lonlat[j, i, 3, :]
 
-                # integrate vertically
-                for k in range(nz):
+                flxU[0] = uo[j, i] * geo.getArcLength(p1, p2, radius=geo.EARTH_RADIUS)
+                self.edgeFluxesU.SetTuple(cellId, flxU)
 
-                    dz = -(bounds_depth[k, 1] - bounds_depth[k, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+                flxV[0] = vo[j, i] * geo.getArcLength(p3, p2, radius=geo.EARTH_RADIUS)
+                self.edgeFluxesV.SetTuple(cellId, flxV)
 
-                    self.edgeFluxesU.GetTuple(cellId, flxU)
-                    flxU[0] += uo[k, j, i] * geo.getArcLength(p1, p2, radius=geo.EARTH_RADIUS) * dz
-                    self.edgeFluxesU.SetTuple(cellId, flxU)
-
-                    self.edgeFluxesV.GetTuple(cellId, flxV)
-                    flxV[0] += vo[k, j, i] * geo.getArcLength(p3, p2, radius=geo.EARTH_RADIUS) * dz
-                    self.edgeFluxesV.SetTuple(cellId, flxV)
-
-                    self.minFlux = min(self.minFlux, flxU[0], flxV[0])
-                    self.maxFlux = max(self.minFlux, flxU[0], flxV[0])
+                self.minFlux = min(self.minFlux, flxU[0], flxV[0])
+                self.maxFlux = max(self.minFlux, flxU[0], flxV[0])
 
                 # increment the cell counter
                 cellId += 1
