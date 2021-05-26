@@ -51,8 +51,8 @@ class DataGen(object):
         self.xx, self.yy = numpy.meshgrid(x, y, indexing='xy')
 
         # cell bounds
-        self.bounds_lon = numpy.zeros((self.ny, self.nx, 4), REAL)
-        self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), REAL)
+        self.bounds_lon = numpy.zeros((self.ny, self.nx, 4), numpy.float64)
+        self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), numpy.float64)
 
         self.bounds_lon[..., 0] = self.xx[:-1, :-1]
         self.bounds_lon[..., 1] = self.xx[:-1, 1:]
@@ -77,6 +77,7 @@ class DataGen(object):
             self.potential[k, ..., 2] = pot[1:, 1:]
             self.potential[k, ..., 3] = pot[1:, :-1]
 
+
     def computeUVFromPotential(self):
         self.u = numpy.zeros((self.nz, self.ny, self.nx), numpy.float64)
         self.v = numpy.zeros((self.nz, self.ny, self.nx), numpy.float64)
@@ -94,15 +95,17 @@ class DataGen(object):
         xyz2 = geo.lonLat2XYZArray(pp2, radius=geo.EARTH_RADIUS)
         xyz3 = geo.lonLat2XYZArray(pp3, radius=geo.EARTH_RADIUS)
 
+        dy21 = self.bounds_lat[..., 2] - self.bounds_lat[..., 1]
+        dx23 = self.bounds_lon[..., 2] - self.bounds_lon[..., 3]
+
         for k in range(self.nz):
             dPhi21 = self.potential[k, ..., 2] - self.potential[k, ..., 1]
             dPhi23 = self.potential[k, ..., 2] - self.potential[k, ..., 3]
-            ds21 = geo.getArcLengthArray(xyz2, xyz1, radius=geo.EARTH_RADIUS)
-            ds23 = geo.getArcLengthArray(xyz2, xyz3, radius=geo.EARTH_RADIUS)
             # east, - d phi/ dy
-            self.u[k, :, :] = - dPhi21 / ds21
+            self.u[k, ...] = - dPhi21 / dy21
             # north, + d phi/ dx, avoid pole
-            self.v[k, :-1, :] = + dPhi23[:-1, :] / ds23[:-1, :]
+            self.v[k, ...] = + dPhi23 / dx23
+
 
     def rotatePole(self, deltaDeg=(0., 0.)):
 
@@ -126,9 +129,9 @@ class DataGen(object):
         transfMatrix = numpy.dot(rot_bet, rot_alp)
 
         # original position
-        xyz0 = numpy.zeros((3,), numpy.float64)
+        xyzOld = numpy.zeros((3,), numpy.float64)
         # transformed position
-        xyz1 = numpy.zeros((3,), numpy.float64)
+        xyzNew = numpy.zeros((3,), numpy.float64)
 
         for j in range(self.ny):
             for i in range(self.nx):
@@ -141,8 +144,8 @@ class DataGen(object):
                     cos_lam = numpy.cos(lam)
                     sin_lam = numpy.sin(lam)
 
-                    xyzOld = rho * cos_lam, rho * sin_lam, sin_the
-                    xyzNew = numpy.dot(transfMatrix, xyz0)
+                    xyzOld[:] = rho * cos_lam, rho * sin_lam, sin_the
+                    xyzNew[:] = numpy.dot(transfMatrix, xyzOld)
 
                     self.bounds_lat[j, i, vertex] = 180. * math.asin(xyzNew[2]) / numpy.pi
                     self.bounds_lon[j, i, vertex] = 180. * math.atan2(xyzNew[1], xyzNew[0]) / numpy.pi
@@ -150,9 +153,10 @@ class DataGen(object):
                     # self.bounds_lon[j, i, vertex] %= 360.
 
                     # date line fix
-                    if self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] > 270.:
+                    dLon = self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0]
+                    if dLon > +270.:
                         self.bounds_lon[j, i, vertex] -= 360.
-                    if self.bounds_lon[j, i, vertex] - self.bounds_lon[j, i, 0] < -270.:
+                    if dLon < -270.:
                         self.bounds_lon[j, i, vertex] += 360.
 
     def save(self):
