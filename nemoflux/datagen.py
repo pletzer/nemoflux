@@ -95,16 +95,13 @@ class DataGen(object):
         xyz2 = geo.lonLat2XYZArray(pp2, radius=geo.EARTH_RADIUS)
         xyz3 = geo.lonLat2XYZArray(pp3, radius=geo.EARTH_RADIUS)
 
-        dy21 = self.bounds_lat[..., 2] - self.bounds_lat[..., 1]
-        dx23 = self.bounds_lon[..., 2] - self.bounds_lon[..., 3]
-
         for k in range(self.nz):
             dPhi21 = self.potential[k, ..., 2] - self.potential[k, ..., 1]
             dPhi23 = self.potential[k, ..., 2] - self.potential[k, ..., 3]
-            # east, - d phi/ dy
-            self.u[k, ...] = - dPhi21 / dy21
-            # north, + d phi/ dx, avoid pole
-            self.v[k, ...] = + dPhi23 / dx23
+            # east, - d phi/ d xi_2, xi_2 is the parametric coord 2
+            self.u[k, ...] = - dPhi21
+            # north, + d phi/ d xi_1, xi_1 is the parametric coord 1
+            self.v[k, ...] = + dPhi23
 
 
     def rotatePole(self, deltaDeg=(0., 0.)):

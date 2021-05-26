@@ -3,10 +3,18 @@ import netCDF4
 import geo
 import defopt
 import numpy
+from horizgrid import HorizGrid
+import mint
 
 class FluxViz(object):
 
-    def __init__(self, tFile, uFile, vFile):
+    def __init__(self, tFile, uFile, vFile, lonLatPoints):
+
+        self.gr = HorizGrid(tFile)
+        self.pli = mint.PolylineIntegral()
+        self.pli.build(self.gr.getMintGrid(), lonLatPoints,
+                       counterclock=False, periodX=360.0)
+
 
         # read the cell bounds
         with netCDF4.Dataset(tFile) as nc:
@@ -49,6 +57,28 @@ class FluxViz(object):
         self.points = vtk.vtkPoints()
         self.points.SetData(self.pointData)
 
+        # grid for the target points
+        ptIds = vtk.vtkIdList()
+        ptIds.SetNumberOfIds(2)
+
+        # build the target point mesh
+        self.lonLatPoints = lonLatPoints
+        numTargetPoints = lonLatPoints.shape[0]
+        self.targetPointData = vtk.vtkDoubleArray()
+        self.targetPointData.SetNumberOfComponents(3)
+        self.targetPointData.SetNumberOfTuples(numTargetPoints)
+        self.targetPointData.SetVoidArray(self.lonLatPoints, numTargetPoints*3, 1)
+        self.targetPoints = vtk.vtkPoints()
+        self.targetPoints.SetData(self.targetPointData)
+        self.gridTargetLine = vtk.vtkPolyData()
+        self.gridTargetLine.SetPoints(self.targetPoints)
+        self.gridTargetLine.Allocate()
+        assert(numTargetPoints > 1)
+        for i in range(numTargetPoints - 1):
+            ptIds.SetId(0, i)
+            ptIds.SetId(1, i + 1)
+            self.gridTargetLine.InsertNextCell(vtk.VTK_LINE, ptIds)
+
         # 1 grid for the U fluxes, 1 grid for the V fluxes
         self.gridU = vtk.vtkPolyData()
         self.gridU.SetPoints(self.points)
@@ -73,9 +103,6 @@ class FluxViz(object):
         #self.gridU.GetCellData().SetActiveScalars('U')
         self.gridV.GetCellData().SetScalars(self.edgeFluxesV)
         #self.gridV.GetCellData().SetActiveScalars('verticallyIntegratedVFlux')
-
-        ptIds = vtk.vtkIdList()
-        ptIds.SetNumberOfIds(2)
 
         flxU = numpy.zeros((1,), numpy.float64)
         flxV = numpy.zeros((1,), numpy.float64)
@@ -175,6 +202,13 @@ class FluxViz(object):
         actorV = vtk.vtkActor()
         actorV.SetMapper(mapperV)
 
+        tubePoints = vtk.vtkTubeFilter()
+        tubePoints.SetInputData(self.gridTargetLine)
+        mapperPoints = vtk.vtkPolyDataMapper()
+        mapperPoints.SetInputConnection(tubePoints.GetOutputPort())
+        actorPoints = vtk.vtkActor()
+        actorPoints.SetMapper(mapperPoints)
+
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
         # perform appropriate camera or actor manipulation depending on the
@@ -188,6 +222,7 @@ class FluxViz(object):
         # Add the actors to the renderer, set the background and size
         ren.AddActor(actorU)
         ren.AddActor(actorV)
+        ren.AddActor(actorPoints)
         ren.AddActor(cbar)
         ren.AddActor(xAxis)
         ren.AddActor(yAxis)
@@ -208,13 +243,15 @@ class FluxViz(object):
         # Start the event loop.
         iren.Start()
 
-def main(*, tFile: str, uFile: str, vFile: str):
+def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str):
     """Visualize fluxes
     :param tFile: netcdf file holding the T-grid
     :param uFile: netcdf file holding u data
     :param vFile: netcdf file holding v data
+    :param lonLatPoints: target points "(lon0, lat0), (lon1, lat1),..."
     """
-    fv = FluxViz(tFile, uFile, vFile)
+    lonLatPoints = numpy.array(eval(lonLatPoints), numpy.float64)
+    fv = FluxViz(tFile, uFile, vFile, lonLatPoints)
     fv.show()
 
 

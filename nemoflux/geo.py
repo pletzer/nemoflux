@@ -1,6 +1,6 @@
 import numpy
 
-EARTH_RADIUS = 6371000. # in metres
+EARTH_RADIUS = 1.0 # 6371000. # in metres
 DEG2RAD = numpy.pi/180.
 
 def lonLat2XYZ(p, radius):
