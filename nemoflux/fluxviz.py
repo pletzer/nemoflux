@@ -79,9 +79,9 @@ class FluxViz(object):
 
         flxU = numpy.zeros((1,), numpy.float64)
         flxV = numpy.zeros((1,), numpy.float64)
-        p1 = numpy.zeros((3,), numpy.float64)
-        p2 = numpy.zeros((3,), numpy.float64)
-        p3 = numpy.zeros((3,), numpy.float64)
+        xyz1 = numpy.zeros((3,), numpy.float64)
+        xyz2 = numpy.zeros((3,), numpy.float64)
+        xyz3 = numpy.zeros((3,), numpy.float64)
 
         self.minFlux = float('inf')
         self.maxFlux = -float('inf')
@@ -107,14 +107,14 @@ class FluxViz(object):
                 ptIds.SetId(1, 4*cellId + 2)
                 self.gridV.InsertNextCell(vtk.VTK_LINE, ptIds)
 
-                p1[:] = self.lonlat[j, i, 1, :]
-                p2[:] = self.lonlat[j, i, 2, :]
-                p3[:] = self.lonlat[j, i, 3, :]
+                xyz1[:] = geo.lonLat2XYZ(self.lonlat[j, i, 1, :], radius=geo.EARTH_RADIUS)
+                xyz2[:] = geo.lonLat2XYZ(self.lonlat[j, i, 2, :], radius=geo.EARTH_RADIUS)
+                xyz3[:] = geo.lonLat2XYZ(self.lonlat[j, i, 3, :], radius=geo.EARTH_RADIUS)
 
-                flxU[0] = uo[j, i] * geo.getArcLength(p1, p2, radius=geo.EARTH_RADIUS)
+                flxU[0] = uo[j, i] * geo.getArcLength(xyz1, xyz2, radius=geo.EARTH_RADIUS)
                 self.edgeFluxesU.SetTuple(cellId, flxU)
 
-                flxV[0] = vo[j, i] * geo.getArcLength(p3, p2, radius=geo.EARTH_RADIUS)
+                flxV[0] = vo[j, i] * geo.getArcLength(xyz3, xyz2, radius=geo.EARTH_RADIUS)
                 self.edgeFluxesV.SetTuple(cellId, flxV)
 
                 self.minFlux = min(self.minFlux, flxU[0], flxV[0])

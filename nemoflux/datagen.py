@@ -1,6 +1,6 @@
 import netCDF4
 import numpy
-from math import pi, cos, sin
+from numpy import pi, cos, sin
 import math
 import defopt
 import geo
