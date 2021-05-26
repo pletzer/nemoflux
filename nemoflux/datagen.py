@@ -28,17 +28,19 @@ class DataGen(object):
         self.nz = nz
 
     def build(self):
-        self.buildScaledVertical()
+        self.buildVertical()
         self.buildUniformHorizontal()
 
-    def buildScaledVertical(self):
+    def buildVertical(self):
         #  non-uniform depth
         # self.zhalf = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0.5)/float(self.nz))**2 for k in range(self.nz)])
         # self.ztop  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0  )/float(self.nz))**2 for k in range(self.nz)])
         # self.zbot  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 1  )/float(self.nz))**2 for k in range(self.nz)])
-        self.zhalf = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0.5)/float(self.nz)) for k in range(self.nz)])
-        self.ztop  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0  )/float(self.nz)) for k in range(self.nz)])
-        self.zbot  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 1  )/float(self.nz)) for k in range(self.nz)])
+        dz = (self.zmax - self.zmin)/float(self.nz)
+        print(f'zmin/zmax = {self.zmin}/{self.zmax}')
+        self.zhalf = numpy.array([self.zmin + (k + 0.5)*dz for k in range(self.nz)])
+        self.ztop  = numpy.array([self.zmin + (k + 0  )*dz for k in range(self.nz)])
+        self.zbot  = numpy.array([self.zmin + (k + 1  )*dz for k in range(self.nz)])
 
     def buildUniformHorizontal(self):
 
@@ -245,7 +247,7 @@ def main(*, potentialFunction: str="y", prefix: str,
     """
     lldg = DataGen(prefix)
     lldg.setSizes(nx, ny, nz)
-    lldg.setBoundingBox(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, zmin=0., zmax=1.)
+    lldg.setBoundingBox(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax)
     lldg.build()
     lldg.rotatePole(deltaDeg=eval(deltaDeg))
     lldg.applyPotential(potentialFunction)

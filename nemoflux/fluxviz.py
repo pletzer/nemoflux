@@ -152,19 +152,56 @@ class FluxViz(object):
 
         print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
 
-    def show(self):
+        # now compute the integrated flux, cell by cell
+        points = self.gr.getPoints().reshape((ny, nx, 4, 3))
+        xyz0 = geo.lonLat2XYZArray(points[:, :, 0, :], radius=geo.EARTH_RADIUS)
+        xyz1 = geo.lonLat2XYZArray(points[:, :, 1, :], radius=geo.EARTH_RADIUS)
+        xyz2 = geo.lonLat2XYZArray(points[:, :, 2, :], radius=geo.EARTH_RADIUS)
+        xyz3 = geo.lonLat2XYZArray(points[:, :, 3, :], radius=geo.EARTH_RADIUS)
 
-        xAxis = vtk.vtkAxisActor()
-        xAxis.SetPoint1((0., -90., 0.))
-        xAxis.SetPoint2((360., -90., 0.))
-        #xAxis.SetTitle('longitude deg.')
-        xAxis.SetDeltaRangeMajor(10.)
+        ds01 = geo.getArcLengthArray(xyz0, xyz1, radius=geo.EARTH_RADIUS)
+        ds12 = geo.getArcLengthArray(xyz1, xyz2, radius=geo.EARTH_RADIUS)
+        ds32 = geo.getArcLengthArray(xyz3, xyz2, radius=geo.EARTH_RADIUS)
+        ds03 = geo.getArcLengthArray(xyz0, xyz3, radius=geo.EARTH_RADIUS)
 
-        yAxis = vtk.vtkAxisActor()
-        yAxis.SetPoint1((0., -90., 0.))
-        yAxis.SetPoint2((0., 90., 0.))
-        #yAxis.SetTitle('latitude deg.')
-        yAxis.SetDeltaRangeMajor(10.)
+        self.integratedVelocity = numpy.zeros((ny, nx, 4), numpy.float64)
+        #        ^
+        #        |
+        #  3-----V-----2
+        #  |           |
+        #  |->   T     U->
+        #  |     ^     |
+        #  |     |     |
+        #  0-----------1
+
+        # south
+        self.integratedVelocity[1:, :, 0] = vo[:-1, :] * ds01[:-1, :]
+        # else:
+        #     # folding, assuming even nx
+        #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
+
+        # east
+        self.integratedVelocity[..., 1] = uo * ds12
+
+        # north
+        self.integratedVelocity[..., 2] = vo * ds32
+
+        # periodic west
+        self.integratedVelocity[:, 1:, 3] = uo[:, :-1] * ds03[:, :-1]
+        self.integratedVelocity[:, 0, 3] = uo[:, -1] * ds03[:, -1]
+
+        # array should have shape (numCells, 4)
+        self.integratedVelocity = self.integratedVelocity.reshape((numCells, 4))
+
+
+    def show(self, npx=1260, npy=960):
+
+        totalFlux = self.pli.getIntegral(self.integratedVelocity)
+        title = vtk.vtkTextActor()
+        title.SetTextScaleMode(0)
+        title.GetTextProperty().SetFontSize(50)
+        title.SetInput(f"total flux = {totalFlux:10.3f}")
+        title.SetPosition((0.6, 0.9))
 
         lut = vtk.vtkLookupTable()
         lut.SetHueRange(0.6, 0.07)
@@ -203,6 +240,7 @@ class FluxViz(object):
         actorV.SetMapper(mapperV)
 
         tubePoints = vtk.vtkTubeFilter()
+        tubePoints.SetRadius(0.2*min(360/self.nx, 180/self.ny))
         tubePoints.SetInputData(self.gridTargetLine)
         mapperPoints = vtk.vtkPolyDataMapper()
         mapperPoints.SetInputConnection(tubePoints.GetOutputPort())
@@ -224,10 +262,9 @@ class FluxViz(object):
         ren.AddActor(actorV)
         ren.AddActor(actorPoints)
         ren.AddActor(cbar)
-        ren.AddActor(xAxis)
-        ren.AddActor(yAxis)
+        ren.AddActor(title)
         ren.SetBackground((0.1, 0.1, 0.1))
-        renWin.SetSize(1260, 960)
+        renWin.SetSize(npx, npy)
         renWin.SetWindowName('Vertically integrated edge flux')
 
         # This allows the interactor to initalize itself. It has to be
@@ -243,15 +280,18 @@ class FluxViz(object):
         # Start the event loop.
         iren.Start()
 
-def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str):
+def main(*, tFile: str, uFile: str, vFile: str, lonLatPointsStr: str):
     """Visualize fluxes
     :param tFile: netcdf file holding the T-grid
     :param uFile: netcdf file holding u data
     :param vFile: netcdf file holding v data
-    :param lonLatPoints: target points "(lon0, lat0), (lon1, lat1),..."
+    :param lonLatPointsStr: target points "(lon0, lat0), (lon1, lat1),..."
     """
-    lonLatPoints = numpy.array(eval(lonLatPoints), numpy.float64)
-    fv = FluxViz(tFile, uFile, vFile, lonLatPoints)
+    xyVals = numpy.array(eval(lonLatPointsStr))
+    numTargetPoints = xyVals.shape[0]
+    lonLatZPoints = numpy.zeros((numTargetPoints, 3), numpy.float64)
+    lonLatZPoints[:, :2] = xyVals
+    fv = FluxViz(tFile, uFile, vFile, lonLatZPoints)
     fv.show()
 
 
