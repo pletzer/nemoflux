@@ -113,7 +113,7 @@ class FluxViz(object):
         self.minFlux = float('inf')
         self.maxFlux = -float('inf')
 
-        self.integratedVelocity = numpy.zeros((ny, nx, 4), numpy.float64)
+        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
         self.computeIntegratedFlux(uo, vo)
 
         
@@ -165,6 +165,8 @@ class FluxViz(object):
         ny, nx = self.ny, self.nx
         numCells = ny*nx
 
+        integratedVelocity = self.integratedVelocity.reshape((ny, nx, 4))
+
         # now compute the integrated flux, cell by cell
         points = self.gr.getPoints().reshape((ny, nx, 4, 3))
         xyz0 = geo.lonLat2XYZArray(points[:, :, 0, :], radius=geo.EARTH_RADIUS)
@@ -187,23 +189,23 @@ class FluxViz(object):
         #  0-----------1
 
         # south
-        self.integratedVelocity[1:, :, 0] = vo[:-1, :] * ds01[:-1, :]
+        integratedVelocity[1:, :, 0] = vo[:-1, :] * ds01[:-1, :]
         # else:
         #     # folding, assuming even nx
         #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
 
         # east
-        self.integratedVelocity[..., 1] = uo * ds12
+        integratedVelocity[..., 1] = uo * ds12
 
         # north
-        self.integratedVelocity[..., 2] = vo * ds32
+        integratedVelocity[..., 2] = vo * ds32
 
         # periodic west
-        self.integratedVelocity[:, 1:, 3] = uo[:, :-1] * ds03[:, :-1]
-        self.integratedVelocity[:, 0, 3] = uo[:, -1] * ds03[:, -1]
+        integratedVelocity[:, 1:, 3] = uo[:, :-1] * ds03[:, :-1]
+        integratedVelocity[:, 0, 3] = uo[:, -1] * ds03[:, -1]
 
         # array should have shape (numCells, 4)
-        self.integratedVelocity = self.integratedVelocity.reshape((numCells, 4))
+        self.integratedVelocity = integratedVelocity.reshape((numCells, 4))
 
 
     def show(self, npx=1260, npy=960):
