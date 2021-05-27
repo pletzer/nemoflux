@@ -287,7 +287,7 @@ class FluxViz(object):
 
         self.lut = vtk.vtkLookupTable()
         self.lut.SetHueRange(0.667, 0.) #(0.6, 0.07)
-        self.lut.SetTableRange(-0.05, 0.05) #self.minFlux, self.maxFlux)
+        self.lut.SetTableRange(self.minFlux, self.maxFlux)
         self.lut.Build()
 
         self.cbar = vtk.vtkScalarBarActor()
@@ -295,34 +295,22 @@ class FluxViz(object):
 
         radiusMin = 0.05*min(360/self.nx, 180/self.ny)
 
-        self.tubesU = vtk.vtkTubeFilter()
-        self.tubesU.SetInputData(self.gridU)
-        self.tubesU.SetRadius(radiusMin) # min radius
-        self.tubesU.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
-        self.tubesU.SetRadiusFactor(100)
-
-        self.tubesV = vtk.vtkTubeFilter()
-        self.tubesV.SetInputData(self.gridV)
-        self.tubesV.SetRadius(radiusMin) # min radius
-        self.tubesV.SetRadiusFactor(100)
-        self.tubesV.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
-
         self.mapperU = vtk.vtkPolyDataMapper()
-        self.mapperU.SetInputConnection(self.tubesU.GetOutputPort())
+        self.mapperU.SetInputData(self.gridU)
         self.mapperU.SetLookupTable(self.lut)
         self.mapperU.SetUseLookupTableScalarRange(1)
         self.actorU = vtk.vtkActor()
         self.actorU.SetMapper(self.mapperU)
 
         self.mapperV = vtk.vtkPolyDataMapper()
-        self.mapperV.SetInputConnection(self.tubesV.GetOutputPort())
+        self.mapperV.SetInputData(self.gridV)
         self.mapperV.SetLookupTable(self.lut)
         self.mapperV.SetUseLookupTableScalarRange(1)
         self.actorV = vtk.vtkActor()
         self.actorV.SetMapper(self.mapperV)
 
         self.tubePoints = vtk.vtkTubeFilter()
-        self.tubePoints.SetRadius(0.2*min(360/self.nx, 180/self.ny))
+        self.tubePoints.SetRadius(2.0)
         self.tubePoints.SetInputData(self.gridTargetLine)
         self.mapperPoints = vtk.vtkPolyDataMapper()
         self.mapperPoints.SetInputConnection(self.tubePoints.GetOutputPort())
