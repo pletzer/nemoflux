@@ -21,11 +21,12 @@ class DataGen(object):
         self.zmin = zmin
         self.zmax = zmax
 
-    def setSizes(self, nx, ny, nz):
-        # number of cells in x, y and z
+    def setSizes(self, nx, ny, nz, nt):
+        # number of cells in x, y, z + number of time steps
         self.nx = nx
         self.ny = ny
         self.nz = nz
+        self.nt = nt
 
     def build(self):
         self.buildVertical()
@@ -68,21 +69,22 @@ class DataGen(object):
 
     def applyPotential(self, potentialFunction):
         zmin, zmax = self.zmin, self.zmax
-        self.potential = numpy.zeros((self.nz, self.ny, self.nx, 4), numpy.float64)
+        self.potential = numpy.zeros((self.nt, self.nz, self.ny, self.nx, 4), numpy.float64)
         A = geo.EARTH_RADIUS
-        for k in range(self.nz):
-            z = self.zhalf[k]
-            x, y = self.xx, self.yy
-            pot = eval(potentialFunction)
-            self.potential[k, ..., 0] = pot[:-1, :-1]
-            self.potential[k, ..., 1] = pot[:-1, 1:]
-            self.potential[k, ..., 2] = pot[1:, 1:]
-            self.potential[k, ..., 3] = pot[1:, :-1]
+        for t in range(self.nt):
+            for k in range(self.nz):
+                z = self.zhalf[k]
+                x, y = self.xx, self.yy
+                pot = eval(potentialFunction)
+                self.potential[t, k, ..., 0] = pot[:-1, :-1]
+                self.potential[t, k, ..., 1] = pot[:-1, 1:]
+                self.potential[t, k, ..., 2] = pot[1:, 1:]
+                self.potential[t, k, ..., 3] = pot[1:, :-1]
 
 
     def computeUVFromPotential(self):
-        self.u = numpy.zeros((self.nz, self.ny, self.nx), numpy.float64)
-        self.v = numpy.zeros((self.nz, self.ny, self.nx), numpy.float64)
+        self.u = numpy.zeros((self.nt, self.nz, self.ny, self.nx), numpy.float64)
+        self.v = numpy.zeros((self.nt, self.nz, self.ny, self.nx), numpy.float64)
 
         pp1 = numpy.zeros((self.ny, self.nx, 3), numpy.float64)
         pp2 = numpy.zeros((self.ny, self.nx, 3), numpy.float64)
@@ -97,13 +99,14 @@ class DataGen(object):
         xyz2 = geo.lonLat2XYZArray(pp2, radius=geo.EARTH_RADIUS)
         xyz3 = geo.lonLat2XYZArray(pp3, radius=geo.EARTH_RADIUS)
 
-        for k in range(self.nz):
-            dPhi21 = self.potential[k, ..., 2] - self.potential[k, ..., 1]
-            dPhi23 = self.potential[k, ..., 2] - self.potential[k, ..., 3]
-            # east, - d phi/ d xi_2, xi_2 is the parametric coord 2
-            self.u[k, ...] = - dPhi21
-            # north, + d phi/ d xi_1, xi_1 is the parametric coord 1
-            self.v[k, ...] = + dPhi23
+        for t in range(self.nt):
+            for k in range(self.nz):
+                dPhi21 = self.potential[t, k, ..., 2] - self.potential[t, k, ..., 1]
+                dPhi23 = self.potential[t, k, ..., 2] - self.potential[t, k, ..., 3]
+                # east, - d phi/ d xi_2, xi_2 is the parametric coord 2
+                self.u[t, k, ...] = - dPhi21
+                # north, + d phi/ d xi_1, xi_1 is the parametric coord 1
+                self.v[t, k, ...] = + dPhi23
 
 
     def rotatePole(self, deltaDeg=(0., 0.)):
@@ -166,40 +169,22 @@ class DataGen(object):
         ncT.createDimension('x', self.nx)
         ncT.createDimension('nvertex', 4)
         ncT.createDimension('axis_nbounds', 2)
-        deptht = ncT.createVariable('deptht', REAL, ('z',))
-        deptht.standard_name = 'depth'
-        deptht.units = 'm'
-        deptht.bounds = 'depthu_bounds'
-        deptht[:] = self.zhalf
         deptht_bounds = ncT.createVariable('deptht_bounds', REAL, ('z', 'axis_nbounds'))
         deptht_bounds[:, 0] = self.ztop
         deptht_bounds[:, 1] = self.zbot
-
         bounds_lat = ncT.createVariable('bounds_lat', REAL, ('y', 'x', 'nvertex'))
         bounds_lat[:] = self.bounds_lat
-
         bounds_lon = ncT.createVariable('bounds_lon', REAL, ('y', 'x', 'nvertex'))
         bounds_lon[:] = self.bounds_lon
-
-        potential = ncT.createVariable('potential', REAL, ('z', 'y', 'x', 'nvertex'))
-        potential.long_name = 'potential'
-        potential[:] = self.potential
         ncT.close()
 
         ncU = netCDF4.Dataset(self.prefix + '_U.nc', 'w')
+        ncU.createDimension('t', self.nt)
         ncU.createDimension('z', self.nz)
         ncU.createDimension('y', self.ny)
         ncU.createDimension('x', self.nx)
         ncU.createDimension('axis_nbounds', 2)
-        depthu = ncU.createVariable('depthu', REAL, ('z',))
-        depthu.standard_name = 'depth'
-        depthu.units = 'm'
-        depthu.bounds = 'depthu_bounds'
-        depthu[:] = self.zhalf
-        depthu_bounds = ncU.createVariable('depthu_bounds', REAL, ('z', 'axis_nbounds'))
-        depthu_bounds[:, 0] = self.ztop
-        depthu_bounds[:, 1] = self.zbot
-        uo = ncU.createVariable('uo', REAL, ('z', 'y', 'x'), fill_value=1.e20)
+        uo = ncU.createVariable('uo', REAL, ('t', 'z', 'y', 'x'), fill_value=1.e20)
         uo.standard_name = 'sea_water_x_velocity'
         uo.units = 'm/s'
         uo[:] = self.u
@@ -207,32 +192,27 @@ class DataGen(object):
         ncU.close()
 
         ncV = netCDF4.Dataset(self.prefix + '_V.nc', 'w')
+        ncV.createDimension('t', self.nt)
         ncV.createDimension('z', self.nz)
         ncV.createDimension('y', self.ny)
         ncV.createDimension('x', self.nx)
         ncV.createDimension('axis_nbounds', 2)
         depthv = ncU.createVariable('depthv', REAL, ('z',))
-        depthv.standard_name = 'depth'
-        depthv.units = 'm'
-        depthv.bounds = 'depthv_bounds'
-        depthv[:] = self.zhalf
-        depthv_bounds = ncV.createVariable('depthv_bounds', REAL, ('z', 'axis_nbounds'))
-        depthv_bounds[:, 0] = self.ztop
-        depthv_bounds[:, 1] = self.zbot
-        vo = ncV.createVariable('vo', REAL, ('z', 'y', 'x'), fill_value=1.e20)
+        vo = ncV.createVariable('vo', REAL, ('t', 'z', 'y', 'x'), fill_value=1.e20)
         vo.standard_name = 'sea_water_y_velocity'
         vo.units = 'm/s'
         vo[:] = self.v
         ncV.close()
 
 
-def main(*, potentialFunction: str="y", prefix: str, 
+def main(*, potentialFunction: str="0.5*(y/180)**2 + sin(2*pi*x/360)", prefix: str, 
             xmin: float=0.0, xmax: float=360., 
             ymin: float=-90., ymax: float=90.,
             zmin: float=0., zmax: float=1.0,
-            nx: int=10, ny: int=4, nz: int=5, deltaDeg: str="(0.,0.)"):
+            nx: int=10, ny: int=4, nz: int=5, nt: int=1, 
+            deltaDeg: str="(0.,0.)"):
     """Generate data
-    :param potentialFunction: potential expression of x and y
+    :param potentialFunction: potential expression of x (logical lon), y (logical lat), z (depth) and t (time index)
     :param prefix: file prefix
     :param xmin: min longitude
     :param xmax: max longitude
@@ -243,10 +223,11 @@ def main(*, potentialFunction: str="y", prefix: str,
     :param nx: number of cells in longitude
     :param ny: number of cells in latitude
     :param nz: number of vertical cells
+    :param nt: number of time steps
     :param deltaDeg: longitude, latitude pole displacement 
     """
     lldg = DataGen(prefix)
-    lldg.setSizes(nx, ny, nz)
+    lldg.setSizes(nx, ny, nz, nt)
     lldg.setBoundingBox(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax)
     lldg.build()
     lldg.rotatePole(deltaDeg=eval(deltaDeg))
