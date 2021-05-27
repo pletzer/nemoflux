@@ -85,48 +85,47 @@ class FluxViz(object):
         # 1 grid for the U fluxes, 1 grid for the V fluxes
         self.gridU = vtk.vtkPolyData()
         self.gridU.SetPoints(self.points)
+        self.edgeFluxesUArray = numpy.zeros((numCells,), numpy.float64)
         self.edgeFluxesU = vtk.vtkDoubleArray()
         self.edgeFluxesU.SetName('U')
         self.edgeFluxesU.SetNumberOfComponents(1)
         self.edgeFluxesU.SetNumberOfTuples(numCells)
+        self.edgeFluxesU.SetVoidArray(self.edgeFluxesUArray, numCells, 1)
 
         self.gridV = vtk.vtkPolyData()
         self.gridV.SetPoints(self.points)
+        self.edgeFluxesVArray = numpy.zeros((numCells,), numpy.float64)
         self.edgeFluxesV = vtk.vtkDoubleArray()
         self.edgeFluxesV.SetName('V')
         self.edgeFluxesV.SetNumberOfComponents(1)
         self.edgeFluxesV.SetNumberOfTuples(numCells)
+        self.edgeFluxesV.SetVoidArray(self.edgeFluxesVArray, numCells, 1)
 
         self.gridU.Allocate()
         self.gridV.Allocate()
 
         self.gridU.GetCellData().SetScalars(self.edgeFluxesU)
-        #self.gridU.GetCellData().SetActiveScalars('U')
+        self.gridU.GetCellData().SetActiveScalars('U')
         self.gridV.GetCellData().SetScalars(self.edgeFluxesV)
-        #self.gridV.GetCellData().SetActiveScalars('verticallyIntegratedVFlux')
+        self.gridV.GetCellData().SetActiveScalars('V')
 
-        flxU = numpy.zeros((1,), numpy.float64)
-        flxV = numpy.zeros((1,), numpy.float64)
-        xyz1 = numpy.zeros((3,), numpy.float64)
-        xyz2 = numpy.zeros((3,), numpy.float64)
-        xyz3 = numpy.zeros((3,), numpy.float64)
+        #        ^
+        #        |
+        #  3-----V-----2
+        #  |           |
+        #  |     T     U-->
+        #  |           |
+        #  0-----------1
+        self.edgeFluxesUArray[:] = self.integratedVelocity[:, 1]
+        self.edgeFluxesVArray[:] = self.integratedVelocity[:, 2]
 
-        self.minFlux = float('inf')
-        self.maxFlux = -float('inf')
-        
+        self.minFlux = min(self.edgeFluxesUArray.min(), self.edgeFluxesVArray.min())
+        self.maxFlux = min(self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
 
-        # compute the vertically integrated lateral fluxes on each horizontal edge
+        # assemble the cells
         cellId = 0
         for j in range(ny):
             for i in range(nx):
-
-                #        ^
-                #        |
-                #  3-----V-----2
-                #  |           |
-                #  |     T     U-->
-                #  |           |
-                #  0-----------1
 
                 ptIds.SetId(0, 4*cellId + 1)
                 ptIds.SetId(1, 4*cellId + 2)
@@ -136,25 +135,10 @@ class FluxViz(object):
                 ptIds.SetId(1, 4*cellId + 2)
                 self.gridV.InsertNextCell(vtk.VTK_LINE, ptIds)
 
-                xyz1[:] = geo.lonLat2XYZ(self.lonlat[j, i, 1, :], radius=geo.EARTH_RADIUS)
-                xyz2[:] = geo.lonLat2XYZ(self.lonlat[j, i, 2, :], radius=geo.EARTH_RADIUS)
-                xyz3[:] = geo.lonLat2XYZ(self.lonlat[j, i, 3, :], radius=geo.EARTH_RADIUS)
-
-                flxU[0] = uo[j, i] * geo.getArcLength(xyz1, xyz2, radius=geo.EARTH_RADIUS)
-                self.edgeFluxesU.SetTuple(cellId, flxU)
-
-                flxV[0] = vo[j, i] * geo.getArcLength(xyz3, xyz2, radius=geo.EARTH_RADIUS)
-                self.edgeFluxesV.SetTuple(cellId, flxV)
-
-                self.minFlux = min(self.minFlux, flxU[0], flxV[0])
-                self.maxFlux = max(self.minFlux, flxU[0], flxV[0])
-
                 # increment the cell counter
                 cellId += 1
 
         print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
-
-
 
 
     def computeIntegratedFlux(self, uo, vo):
