@@ -64,6 +64,8 @@ class FluxViz(object):
         elif key == 'b':
             # backward in time
             self.timeIndex = (self.timeIndex - 1) % self.nt
+        elif key == 'z':
+            self.camera.OrthogonalizeViewUp()
         # update the data
         uo, vo = self.getUV()
         self.computeIntegratedFlux(uo, vo)
@@ -72,8 +74,6 @@ class FluxViz(object):
         self.lut.SetTableRange(self.minFlux, self.maxFlux)
         self.lut.Modified()
         self.cbar.Modified()
-        self.mapperU.Update()
-        self.mapperV.Update()
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
         self.title.SetInput(f'total flux: {totalFlux:10.3f} @ time {self.timeIndex}')
         self.title.Modified()
@@ -332,11 +332,14 @@ class FluxViz(object):
         self.actorPoints = vtk.vtkActor()
         self.actorPoints.SetMapper(self.mapperPoints)
 
+        self.camera = vtk.vtkCamera()
+
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
         # perform appropriate camera or actor manipulation depending on the
         # nature of the events.
         self.ren = vtk.vtkRenderer()
+        self.ren.SetActiveCamera(self.camera)
         self.renWin = vtk.vtkRenderWindow()
         self.renWin.AddRenderer(self.ren)
         self.iren = vtk.vtkRenderWindowInteractor()
