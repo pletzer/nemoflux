@@ -44,6 +44,9 @@ class FluxViz(object):
         uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
         vo = numpy.tensordot(dz, vo, axes=(0, 0))
 
+        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
+        self.computeIntegratedFlux(uo, vo)
+
         # points, 4 points per cell, 3D
         self.lonlat = numpy.zeros((ny, nx, 4, 3), numpy.float64)
         self.lonlat[..., 0] = bounds_lon
@@ -112,10 +115,6 @@ class FluxViz(object):
 
         self.minFlux = float('inf')
         self.maxFlux = -float('inf')
-
-        self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
-        self.computeIntegratedFlux(uo, vo)
-
         
 
         # compute the vertically integrated lateral fluxes on each horizontal edge
