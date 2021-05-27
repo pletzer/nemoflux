@@ -113,6 +113,11 @@ class FluxViz(object):
         self.minFlux = float('inf')
         self.maxFlux = -float('inf')
 
+        self.integratedVelocity = numpy.zeros((ny, nx, 4), numpy.float64)
+        self.computeIntegratedFlux(uo, vo)
+
+        
+
         # compute the vertically integrated lateral fluxes on each horizontal edge
         cellId = 0
         for j in range(ny):
@@ -152,6 +157,14 @@ class FluxViz(object):
 
         print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
 
+
+
+
+    def computeIntegratedFlux(self, uo, vo):
+
+        ny, nx = self.ny, self.nx
+        numCells = ny*nx
+
         # now compute the integrated flux, cell by cell
         points = self.gr.getPoints().reshape((ny, nx, 4, 3))
         xyz0 = geo.lonLat2XYZArray(points[:, :, 0, :], radius=geo.EARTH_RADIUS)
@@ -164,7 +177,6 @@ class FluxViz(object):
         ds32 = geo.getArcLengthArray(xyz3, xyz2, radius=geo.EARTH_RADIUS)
         ds03 = geo.getArcLengthArray(xyz0, xyz3, radius=geo.EARTH_RADIUS)
 
-        self.integratedVelocity = numpy.zeros((ny, nx, 4), numpy.float64)
         #        ^
         #        |
         #  3-----V-----2
