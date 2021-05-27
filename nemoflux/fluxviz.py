@@ -33,6 +33,8 @@ class FluxViz(object):
 
         self.buildTargetLineGrid(lonLatPoints)
         self.buildEdgeUVGrids(bounds_lon, bounds_lat)
+        print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
+
 
     def buildTargetLineGrid(self, lonLatPoints):
 
@@ -135,8 +137,6 @@ class FluxViz(object):
 
                 # increment the cell counter
                 cellId += 1
-
-        print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
 
 
     def getUV(self):
@@ -296,6 +296,11 @@ class FluxViz(object):
 
         # Start the event loop.
         iren.Start()
+
+def __del__(self):
+    self.ncU.close()
+    self.ncV.close()
+
 
 def main(*, tFile: str, uFile: str, vFile: str, lonLatPointsStr: str):
     """Visualize fluxes
