@@ -89,15 +89,13 @@ class FluxViz(object):
         self.edgeFluxesU.SetName('U')
         self.edgeFluxesU.SetNumberOfComponents(1)
         self.edgeFluxesU.SetNumberOfTuples(numCells)
-        self.edgeFluxesU.Fill(0.)
 
         self.gridV = vtk.vtkPolyData()
         self.gridV.SetPoints(self.points)
         self.edgeFluxesV = vtk.vtkDoubleArray()
-        self.edgeFluxesU.SetName('V')
+        self.edgeFluxesV.SetName('V')
         self.edgeFluxesV.SetNumberOfComponents(1)
         self.edgeFluxesV.SetNumberOfTuples(numCells)
-        self.edgeFluxesV.Fill(0.)
 
         self.gridU.Allocate()
         self.gridV.Allocate()
