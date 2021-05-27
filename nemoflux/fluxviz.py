@@ -21,29 +21,14 @@ class FluxViz(object):
             bounds_lat = nc.variables['bounds_lat'][:]
             bounds_lon = nc.variables['bounds_lon'][:]
             depth_half = nc.variables['deptht'][:]
-            bounds_depth = nc.variables['deptht_bounds'][:]
+            self.bounds_depth = nc.variables['deptht_bounds'][:]
 
-        # read u
-        with netCDF4.Dataset(uFile) as nc:
-            uo = nc.variables['uo'][:]
-        # set the velocity to zero where missing
-        uo = numpy.ma.filled(uo, 0.0)
+        self.ncU = netCDF4.Dataset(uFile)
+        self.ncV = netCDF4.Dataset(vFile)
+        uo, vo = self.getUV()
 
-        # read v
-        with netCDF4.Dataset(vFile) as nc:
-            vo = nc.variables['vo'][:]
-        # set the velocity to zero where missing
-        vo = numpy.ma.filled(vo, 0.0)
-
-        nz, ny, nx = uo.shape
+        ny, nx = self.ny, self.nx
         numCells = ny * nx
-        self.ny, self.nx = ny, nx
-
-        # integrate vertically, multiplying by the thickness of the layers
-        dz = -(bounds_depth[:, 1] - bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
-        uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
-        vo = numpy.tensordot(dz, vo, axes=(0, 0))
-
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
         self.computeIntegratedFlux(uo, vo)
 
@@ -139,6 +124,30 @@ class FluxViz(object):
                 cellId += 1
 
         print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
+
+
+    def getUV(self):
+
+        # read u
+        uo = self.ncU.variables['uo'][:]
+        # set the velocity to zero where missing
+        uo = numpy.ma.filled(uo, 0.0)
+
+        # read v
+        vo = self.ncV.variables['vo'][:]
+        # set the velocity to zero where missing
+        vo = numpy.ma.filled(vo, 0.0)
+
+        nz, ny, nx = uo.shape
+        numCells = ny * nx
+        self.ny, self.nx = ny, nx
+
+        # integrate vertically, multiplying by the thickness of the layers
+        dz = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+        uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
+        vo = numpy.tensordot(dz, vo, axes=(0, 0))
+
+        return uo, vo
 
 
     def computeIntegratedFlux(self, uo, vo):
