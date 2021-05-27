@@ -57,15 +57,12 @@ class FluxViz(object):
 
 
     def update(self, key):
-        print(f'typed {key}')
         if key == 't':
             # forward in time
             self.timeIndex = (self.timeIndex + 1) % self.nt
         elif key == 'b':
             # backward in time
             self.timeIndex = (self.timeIndex - 1) % self.nt
-        elif key == 'z':
-            self.camera.OrthogonalizeViewUp()
         # update the data
         uo, vo = self.getUV()
         self.computeIntegratedFlux(uo, vo)
@@ -289,14 +286,14 @@ class FluxViz(object):
         self.title.SetPosition((0.6, 0.9))
 
         self.lut = vtk.vtkLookupTable()
-        self.lut.SetHueRange(0.6, 0.07)
+        self.lut.SetHueRange(0.667, 0.) #(0.6, 0.07)
         self.lut.SetTableRange(-0.05, 0.05) #self.minFlux, self.maxFlux)
         self.lut.Build()
 
         self.cbar = vtk.vtkScalarBarActor()
         self.cbar.SetLookupTable(self.lut)
 
-        radiusMin = 0.1*min(360/self.nx, 180/self.ny)
+        radiusMin = 0.05*min(360/self.nx, 180/self.ny)
 
         self.tubesU = vtk.vtkTubeFilter()
         self.tubesU.SetInputData(self.gridU)
@@ -332,14 +329,11 @@ class FluxViz(object):
         self.actorPoints = vtk.vtkActor()
         self.actorPoints.SetMapper(self.mapperPoints)
 
-        self.camera = vtk.vtkCamera()
-
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
         # perform appropriate camera or actor manipulation depending on the
         # nature of the events.
         self.ren = vtk.vtkRenderer()
-        self.ren.SetActiveCamera(self.camera)
         self.renWin = vtk.vtkRenderWindow()
         self.renWin.AddRenderer(self.ren)
         self.iren = vtk.vtkRenderWindowInteractor()
@@ -358,15 +352,12 @@ class FluxViz(object):
         # allow the user to interact with the visualisation
         self.callBack = CallBack(self)
         self.iren.AddObserver('KeyPressEvent', self.callBack.execute)
+        print('type "t"/"b" to step forward/backward in time')
 
         # This allows the interactor to initalize itself. It has to be
         # called before an event loop.
         self.iren.Initialize()
 
-        # We'll zoom in a little by accessing the camera and invoking a "Zoom"
-        # method on it.
-        # ren.ResetCamera()
-        # ren.GetActiveCamera().Zoom(1.5)
         self.renWin.Render()
 
         # Start the event loop.
