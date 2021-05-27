@@ -22,21 +22,11 @@ class FluxViz(object):
     def __init__(self, tFile, uFile, vFile, lonLatPoints):
 
         self.timeIndex = 0
+        self.ncU = netCDF4.Dataset(uFile)
+        self.ncV = netCDF4.Dataset(vFile)
 
-        # get the sizes
-        self.nt, self.nz, self.ny, self.nx = 1, 1, 0, 0
-        with netCDF4.Dataset(uFile) as ncU:
-            shapeU = ncU.variables['uo'].shape
-            try:
-                self.nt, self.nz, self.ny, self.nx = shapeU
-            except:
-                try:
-                    self.nz, self.ny, self.nx = shapeU
-                except:
-                    try:
-                        self.ny, self.nx = shapeU
-                    except:
-                        raise RuntimeError("ERROR: uo's shape does not match (t, z, y, x), (z, y, x) or (y, x)")
+        self.nt, self.nz, self.ny, self.nx = self.getSizes()
+        numCells = self.ny * self.nx
 
         self.gr = HorizGrid(tFile)
         self.pli = mint.PolylineIntegral()
@@ -51,12 +41,14 @@ class FluxViz(object):
 
         self.thickness = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
 
-        self.ncU = netCDF4.Dataset(uFile)
-        self.ncV = netCDF4.Dataset(vFile)
         uo, vo = self.getUV()
+
+        self.edgeFluxesUArray = numpy.zeros((numCells,), numpy.float64)
+        self.edgeFluxesVArray = numpy.zeros((numCells,), numpy.float64)
 
         numCells = self.ny * self.nx
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
+        self.minFlux, self.maxFlux = +float('inf'), -float('inf')
         self.computeIntegratedFlux(uo, vo)
 
         self.buildTargetLineGrid(lonLatPoints)
@@ -75,9 +67,36 @@ class FluxViz(object):
         # update the data
         uo, vo = self.getUV()
         self.computeIntegratedFlux(uo, vo)
+        self.edgeFluxesUArray[:] = self.integratedVelocity[:, 1]
+        self.edgeFluxesVArray[:] = self.integratedVelocity[:, 2]
+        self.lut.SetTableRange(self.minFlux, self.maxFlux)
+        self.lut.Modified()
+        self.cbar.Modified()
+        self.mapperU.Update()
+        self.mapperV.Update()
+        totalFlux = self.pli.getIntegral(self.integratedVelocity)
+        self.title.SetInput(f'total flux: {totalFlux:10.3f} @ time {self.timeIndex}')
+        self.title.Modified()
         self.edgeFluxesU.Modified()
         self.edgeFluxesV.Modified()
-        print(f'time index is now {self.timeIndex} nt = {self.nt}')
+        print(f'time index is now {self.timeIndex} min/max flux: {self.minFlux:10.3f}/{self.maxFlux:10.3f} nt = {self.nt}')
+
+
+    def getSizes(self):
+        # get the sizes
+        nt, nz, ny, nx = 1, 1, 0, 0
+        shapeU = self.ncU.variables['uo'].shape
+        try:
+            nt, nz, ny, nx = shapeU
+        except:
+            try:
+                nz, ny, nx = shapeU
+            except:
+                try:
+                    ny, nx = shapeU
+                except:
+                    raise RuntimeError("ERROR: uo's shape does not match (t, z, y, x), (z, y, x) or (y, x)")
+        return nt, nz, ny, nx
 
 
     def buildTargetLineGrid(self, lonLatPoints):
@@ -106,11 +125,10 @@ class FluxViz(object):
 
     def buildEdgeUVGrids(self, bounds_lon, bounds_lat):
 
-        ny, nx = self.ny, self.nx
-        numCells = ny * nx
+        numCells = self.ny * self.nx
 
         # points, 4 points per cell, 3D
-        self.lonlat = numpy.zeros((ny, nx, 4, 3), numpy.float64)
+        self.lonlat = numpy.zeros((self.ny, self.nx, 4, 3), numpy.float64)
         self.lonlat[..., 0] = bounds_lon
         self.lonlat[..., 1] = bounds_lat
 
@@ -126,7 +144,6 @@ class FluxViz(object):
         # 1 grid for the U fluxes, 1 grid for the V fluxes
         self.gridU = vtk.vtkPolyData()
         self.gridU.SetPoints(self.points)
-        self.edgeFluxesUArray = numpy.zeros((numCells,), numpy.float64)
         self.edgeFluxesU = vtk.vtkDoubleArray()
         self.edgeFluxesU.SetName('U')
         self.edgeFluxesU.SetNumberOfComponents(1)
@@ -135,7 +152,6 @@ class FluxViz(object):
 
         self.gridV = vtk.vtkPolyData()
         self.gridV.SetPoints(self.points)
-        self.edgeFluxesVArray = numpy.zeros((numCells,), numpy.float64)
         self.edgeFluxesV = vtk.vtkDoubleArray()
         self.edgeFluxesV.SetName('V')
         self.edgeFluxesV.SetNumberOfComponents(1)
@@ -150,26 +166,13 @@ class FluxViz(object):
         self.gridV.GetCellData().SetScalars(self.edgeFluxesV)
         self.gridV.GetCellData().SetActiveScalars('V')
 
-        #        ^
-        #        |
-        #  3-----V-----2
-        #  |           |
-        #  |     T     U-->
-        #  |           |
-        #  0-----------1
-        self.edgeFluxesUArray[:] = self.integratedVelocity[:, 1]
-        self.edgeFluxesVArray[:] = self.integratedVelocity[:, 2]
-
-        self.minFlux = min(self.edgeFluxesUArray.min(), self.edgeFluxesVArray.min())
-        self.maxFlux = min(self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
-
         ptIds = vtk.vtkIdList()
         ptIds.SetNumberOfIds(2)
 
         # assemble the cells
         cellId = 0
-        for j in range(ny):
-            for i in range(nx):
+        for j in range(self.ny):
+            for i in range(self.nx):
 
                 ptIds.SetId(0, 4*cellId + 1)
                 ptIds.SetId(1, 4*cellId + 2)
@@ -262,6 +265,19 @@ class FluxViz(object):
         # array should have shape (numCells, 4)
         self.integratedVelocity = integratedVelocity.reshape((numCells, 4))
 
+        #        ^
+        #        |
+        #  3-----V-----2
+        #  |           |
+        #  |     T     U-->
+        #  |           |
+        #  0-----------1
+        self.edgeFluxesUArray[:] = self.integratedVelocity[:, 1]
+        self.edgeFluxesVArray[:] = self.integratedVelocity[:, 2]
+
+        self.minFlux = min(self.minFlux, self.edgeFluxesUArray.min(), self.edgeFluxesVArray.min())
+        self.maxFlux = max(self.maxFlux, self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
+
 
     def show(self, npx=1260, npy=960):
 
@@ -269,12 +285,12 @@ class FluxViz(object):
         self.title = vtk.vtkTextActor()
         self.title.SetTextScaleMode(0)
         self.title.GetTextProperty().SetFontSize(50)
-        self.title.SetInput(f"total flux = {totalFlux:10.3f}")
+        self.title.SetInput(f"total flux = {totalFlux:10.3f} @ time {self.timeIndex}")
         self.title.SetPosition((0.6, 0.9))
 
         self.lut = vtk.vtkLookupTable()
         self.lut.SetHueRange(0.6, 0.07)
-        self.lut.SetTableRange(self.minFlux, self.maxFlux)
+        self.lut.SetTableRange(-0.05, 0.05) #self.minFlux, self.maxFlux)
         self.lut.Build()
 
         self.cbar = vtk.vtkScalarBarActor()
