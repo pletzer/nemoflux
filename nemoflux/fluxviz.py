@@ -10,11 +10,13 @@ class FluxViz(object):
 
     def __init__(self, tFile, uFile, vFile, lonLatPoints):
 
+        self.timeIndex = 0
+        self.nt = 1
+
         self.gr = HorizGrid(tFile)
         self.pli = mint.PolylineIntegral()
         self.pli.build(self.gr.getMintGrid(), lonLatPoints,
                        counterclock=False, periodX=360.0)
-
 
         # read the cell bounds
         with netCDF4.Dataset(tFile) as nc:
@@ -22,18 +24,35 @@ class FluxViz(object):
             bounds_lon = nc.variables['bounds_lon'][:]
             self.bounds_depth = nc.variables['deptht_bounds'][:]
 
+        self.thickness = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+
         self.ncU = netCDF4.Dataset(uFile)
         self.ncV = netCDF4.Dataset(vFile)
         uo, vo = self.getUV()
 
-        ny, nx = self.ny, self.nx
-        numCells = ny * nx
+        numCells = self.ny * self.nx
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
         self.computeIntegratedFlux(uo, vo)
 
         self.buildTargetLineGrid(lonLatPoints)
         self.buildEdgeUVGrids(bounds_lon, bounds_lat)
         print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
+
+
+    def update(self, key):
+        if key == 't':
+            # forward in time
+            self.timeIndex = (self.timeIndex + 1) % self.nt
+        elif key == 'b':
+            # backward in time
+            self.timeIndex = (self.timeIndex - 1) % self.nt
+        # update the data
+        uo, vo = self.getUV()
+        self.computeIntegratedFlux(uo, vo)
+        self.edgeFluxesUArray.Modified()
+        self.edgeFluxesUArray.Update()
+        self.edgeFluxesVArray.Modified()
+        self.edgeFluxesVArray.Update()
 
 
     def buildTargetLineGrid(self, lonLatPoints):
@@ -142,12 +161,26 @@ class FluxViz(object):
     def getUV(self):
 
         # read u
-        uo = self.ncU.variables['uo'][:]
+        try:
+            uo = self.ncU.variables['uo'][self.timeIndex, :, :, :]
+        except:
+            try:
+                uo = self.ncU.variables['uo'][...]
+            except:
+                raise RuntimeError('ERROR: could not read u field')
+
         # set the velocity to zero where missing
         uo = numpy.ma.filled(uo, 0.0)
 
         # read v
-        vo = self.ncV.variables['vo'][:]
+        try:
+            vo = self.ncV.variables['vo'][self.timeIndex, :, :, :]
+        except:
+            try:
+                vo = self.ncV.variables['vo'][...]
+            except:
+                raise RuntimeError('ERROR: could not read v field')
+
         # set the velocity to zero where missing
         vo = numpy.ma.filled(vo, 0.0)
 
@@ -156,9 +189,8 @@ class FluxViz(object):
         self.ny, self.nx = ny, nx
 
         # integrate vertically, multiplying by the thickness of the layers
-        dz = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
-        uo = numpy.tensordot(dz, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
-        vo = numpy.tensordot(dz, vo, axes=(0, 0))
+        uo = numpy.tensordot(self.thickness, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
+        vo = numpy.tensordot(self.thickness, vo, axes=(0, 0))
 
         return uo, vo
 
