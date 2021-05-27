@@ -6,12 +6,37 @@ import numpy
 from horizgrid import HorizGrid
 import mint
 
+class CallBack(object):
+
+    def __init__(self, fluxviz):
+        self.fluxviz = fluxviz
+
+    def execute(self, obj, event):
+        key = obj.GetKeySym()
+        self.fluxviz.update(key)
+        self.fluxviz.renWin.Render()
+
+
 class FluxViz(object):
 
     def __init__(self, tFile, uFile, vFile, lonLatPoints):
 
         self.timeIndex = 0
-        self.nt = 1
+
+        # get the sizes
+        self.nt, self.nz, self.ny, self.nx = 1, 1, 0, 0
+        with netCDF4.Dataset(uFile) as ncU:
+            shapeU = ncU.variables['uo'].shape
+            try:
+                self.nt, self.nz, self.ny, self.nx = shapeU
+            except:
+                try:
+                    self.nz, self.ny, self.nx = shapeU
+                except:
+                    try:
+                        self.ny, self.nx = shapeU
+                    except:
+                        raise RuntimeError("ERROR: uo's shape does not match (t, z, y, x), (z, y, x) or (y, x)")
 
         self.gr = HorizGrid(tFile)
         self.pli = mint.PolylineIntegral()
@@ -40,6 +65,7 @@ class FluxViz(object):
 
 
     def update(self, key):
+        print(f'typed {key}')
         if key == 't':
             # forward in time
             self.timeIndex = (self.timeIndex + 1) % self.nt
@@ -49,10 +75,9 @@ class FluxViz(object):
         # update the data
         uo, vo = self.getUV()
         self.computeIntegratedFlux(uo, vo)
-        self.edgeFluxesUArray.Modified()
-        self.edgeFluxesUArray.Update()
-        self.edgeFluxesVArray.Modified()
-        self.edgeFluxesVArray.Update()
+        self.edgeFluxesU.Modified()
+        self.edgeFluxesV.Modified()
+        print(f'time index is now {self.timeIndex} nt = {self.nt}')
 
 
     def buildTargetLineGrid(self, lonLatPoints):
@@ -184,10 +209,6 @@ class FluxViz(object):
         # set the velocity to zero where missing
         vo = numpy.ma.filled(vo, 0.0)
 
-        nz, ny, nx = uo.shape
-        numCells = ny * nx
-        self.ny, self.nx = ny, nx
-
         # integrate vertically, multiplying by the thickness of the layers
         uo = numpy.tensordot(self.thickness, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
         vo = numpy.tensordot(self.thickness, vo, axes=(0, 0))
@@ -197,13 +218,12 @@ class FluxViz(object):
 
     def computeIntegratedFlux(self, uo, vo):
 
-        ny, nx = self.ny, self.nx
-        numCells = ny*nx
+        numCells = self.ny * self.nx
 
-        integratedVelocity = self.integratedVelocity.reshape((ny, nx, 4))
+        integratedVelocity = self.integratedVelocity.reshape((self.ny, self.nx, 4))
 
         # now compute the integrated flux, cell by cell
-        points = self.gr.getPoints().reshape((ny, nx, 4, 3))
+        points = self.gr.getPoints().reshape((self.ny, self.nx, 4, 3))
         xyz0 = geo.lonLat2XYZArray(points[:, :, 0, :], radius=geo.EARTH_RADIUS)
         xyz1 = geo.lonLat2XYZArray(points[:, :, 1, :], radius=geo.EARTH_RADIUS)
         xyz2 = geo.lonLat2XYZArray(points[:, :, 2, :], radius=geo.EARTH_RADIUS)
@@ -246,88 +266,92 @@ class FluxViz(object):
     def show(self, npx=1260, npy=960):
 
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
-        title = vtk.vtkTextActor()
-        title.SetTextScaleMode(0)
-        title.GetTextProperty().SetFontSize(50)
-        title.SetInput(f"total flux = {totalFlux:10.3f}")
-        title.SetPosition((0.6, 0.9))
+        self.title = vtk.vtkTextActor()
+        self.title.SetTextScaleMode(0)
+        self.title.GetTextProperty().SetFontSize(50)
+        self.title.SetInput(f"total flux = {totalFlux:10.3f}")
+        self.title.SetPosition((0.6, 0.9))
 
-        lut = vtk.vtkLookupTable()
-        lut.SetHueRange(0.6, 0.07)
-        lut.SetTableRange(self.minFlux, self.maxFlux)
-        lut.Build()
+        self.lut = vtk.vtkLookupTable()
+        self.lut.SetHueRange(0.6, 0.07)
+        self.lut.SetTableRange(self.minFlux, self.maxFlux)
+        self.lut.Build()
 
-        cbar = vtk.vtkScalarBarActor()
-        cbar.SetLookupTable(lut)
+        self.cbar = vtk.vtkScalarBarActor()
+        self.cbar.SetLookupTable(self.lut)
 
         radiusMin = 0.1*min(360/self.nx, 180/self.ny)
 
-        tubesU = vtk.vtkTubeFilter()
-        tubesU.SetInputData(self.gridU)
-        tubesU.SetRadius(radiusMin) # min radius
-        tubesU.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
-        tubesU.SetRadiusFactor(100)
+        self.tubesU = vtk.vtkTubeFilter()
+        self.tubesU.SetInputData(self.gridU)
+        self.tubesU.SetRadius(radiusMin) # min radius
+        self.tubesU.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
+        self.tubesU.SetRadiusFactor(100)
 
-        tubesV = vtk.vtkTubeFilter()
-        tubesV.SetInputData(self.gridV)
-        tubesV.SetRadius(radiusMin) # min radius
-        tubesV.SetRadiusFactor(100)
-        tubesV.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
+        self.tubesV = vtk.vtkTubeFilter()
+        self.tubesV.SetInputData(self.gridV)
+        self.tubesV.SetRadius(radiusMin) # min radius
+        self.tubesV.SetRadiusFactor(100)
+        self.tubesV.SetVaryRadiusToVaryRadiusByAbsoluteScalar()
 
-        mapperU = vtk.vtkPolyDataMapper()
-        mapperU.SetInputConnection(tubesU.GetOutputPort())
-        mapperU.SetLookupTable(lut)
-        mapperU.SetUseLookupTableScalarRange(1)
-        actorU = vtk.vtkActor()
-        actorU.SetMapper(mapperU)
+        self.mapperU = vtk.vtkPolyDataMapper()
+        self.mapperU.SetInputConnection(self.tubesU.GetOutputPort())
+        self.mapperU.SetLookupTable(self.lut)
+        self.mapperU.SetUseLookupTableScalarRange(1)
+        self.actorU = vtk.vtkActor()
+        self.actorU.SetMapper(self.mapperU)
 
-        mapperV = vtk.vtkPolyDataMapper()
-        mapperV.SetInputConnection(tubesV.GetOutputPort())
-        mapperV.SetLookupTable(lut)
-        mapperV.SetUseLookupTableScalarRange(1)
-        actorV = vtk.vtkActor()
-        actorV.SetMapper(mapperV)
+        self.mapperV = vtk.vtkPolyDataMapper()
+        self.mapperV.SetInputConnection(self.tubesV.GetOutputPort())
+        self.mapperV.SetLookupTable(self.lut)
+        self.mapperV.SetUseLookupTableScalarRange(1)
+        self.actorV = vtk.vtkActor()
+        self.actorV.SetMapper(self.mapperV)
 
-        tubePoints = vtk.vtkTubeFilter()
-        tubePoints.SetRadius(0.2*min(360/self.nx, 180/self.ny))
-        tubePoints.SetInputData(self.gridTargetLine)
-        mapperPoints = vtk.vtkPolyDataMapper()
-        mapperPoints.SetInputConnection(tubePoints.GetOutputPort())
-        actorPoints = vtk.vtkActor()
-        actorPoints.SetMapper(mapperPoints)
+        self.tubePoints = vtk.vtkTubeFilter()
+        self.tubePoints.SetRadius(0.2*min(360/self.nx, 180/self.ny))
+        self.tubePoints.SetInputData(self.gridTargetLine)
+        self.mapperPoints = vtk.vtkPolyDataMapper()
+        self.mapperPoints.SetInputConnection(self.tubePoints.GetOutputPort())
+        self.actorPoints = vtk.vtkActor()
+        self.actorPoints.SetMapper(self.mapperPoints)
 
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
         # perform appropriate camera or actor manipulation depending on the
         # nature of the events.
-        ren = vtk.vtkRenderer()
-        renWin = vtk.vtkRenderWindow()
-        renWin.AddRenderer(ren)
-        iren = vtk.vtkRenderWindowInteractor()
-        iren.SetRenderWindow(renWin)
+        self.ren = vtk.vtkRenderer()
+        self.renWin = vtk.vtkRenderWindow()
+        self.renWin.AddRenderer(self.ren)
+        self.iren = vtk.vtkRenderWindowInteractor()
+        self.iren.SetRenderWindow(self.renWin)
 
         # Add the actors to the renderer, set the background and size
-        ren.AddActor(actorU)
-        ren.AddActor(actorV)
-        ren.AddActor(actorPoints)
-        ren.AddActor(cbar)
-        ren.AddActor(title)
-        ren.SetBackground((0.1, 0.1, 0.1))
-        renWin.SetSize(npx, npy)
-        renWin.SetWindowName('Vertically integrated edge flux')
+        self.ren.AddActor(self.actorU)
+        self.ren.AddActor(self.actorV)
+        self.ren.AddActor(self.actorPoints)
+        self.ren.AddActor(self.cbar)
+        self.ren.AddActor(self.title)
+        self.ren.SetBackground((0.1, 0.1, 0.1))
+        self.renWin.SetSize(npx, npy)
+        self.renWin.SetWindowName('Vertically integrated edge flux')
+
+        # allow the user to interact with the visualisation
+        self.callBack = CallBack(self)
+        self.iren.AddObserver('KeyPressEvent', self.callBack.execute)
 
         # This allows the interactor to initalize itself. It has to be
         # called before an event loop.
-        iren.Initialize()
+        self.iren.Initialize()
 
         # We'll zoom in a little by accessing the camera and invoking a "Zoom"
         # method on it.
         # ren.ResetCamera()
         # ren.GetActiveCamera().Zoom(1.5)
-        renWin.Render()
+        self.renWin.Render()
 
         # Start the event loop.
-        iren.Start()
+        self.iren.Start()
 
 def __del__(self):
     self.ncU.close()

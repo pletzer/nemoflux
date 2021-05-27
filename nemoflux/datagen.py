@@ -71,6 +71,7 @@ class DataGen(object):
         zmin, zmax = self.zmin, self.zmax
         self.potential = numpy.zeros((self.nt, self.nz, self.ny, self.nx, 4), numpy.float64)
         A = geo.EARTH_RADIUS
+        nt = self.nt
         for t in range(self.nt):
             for k in range(self.nz):
                 z = self.zhalf[k]
@@ -205,7 +206,7 @@ class DataGen(object):
         ncV.close()
 
 
-def main(*, potentialFunction: str="0.5*(y/180)**2 + sin(2*pi*x/360)", prefix: str, 
+def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str, 
             xmin: float=0.0, xmax: float=360., 
             ymin: float=-90., ymax: float=90.,
             zmin: float=0., zmax: float=1.0,
