@@ -20,7 +20,6 @@ class FluxViz(object):
         with netCDF4.Dataset(tFile) as nc:
             bounds_lat = nc.variables['bounds_lat'][:]
             bounds_lon = nc.variables['bounds_lon'][:]
-            depth_half = nc.variables['deptht'][:]
             self.bounds_depth = nc.variables['deptht_bounds'][:]
 
         self.ncU = netCDF4.Dataset(uFile)
@@ -32,20 +31,11 @@ class FluxViz(object):
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
         self.computeIntegratedFlux(uo, vo)
 
-        # points, 4 points per cell, 3D
-        self.lonlat = numpy.zeros((ny, nx, 4, 3), numpy.float64)
-        self.lonlat[..., 0] = bounds_lon
-        self.lonlat[..., 1] = bounds_lat
+        self.buildTargetLineGrid(lonLatPoints)
+        self.buildEdgeUVGrids(bounds_lon, bounds_lat)
 
-        self.pointData = vtk.vtkDoubleArray()
-        self.pointData.SetNumberOfComponents(3)
-        self.pointData.SetNumberOfTuples(4 * numCells)
-        self.pointData.SetVoidArray(self.lonlat, 4 * numCells * 3, 1)
+    def buildTargetLineGrid(self, lonLatPoints):
 
-        self.points = vtk.vtkPoints()
-        self.points.SetData(self.pointData)
-
-        # grid for the target points
         ptIds = vtk.vtkIdList()
         ptIds.SetNumberOfIds(2)
 
@@ -66,6 +56,26 @@ class FluxViz(object):
             ptIds.SetId(0, i)
             ptIds.SetId(1, i + 1)
             self.gridTargetLine.InsertNextCell(vtk.VTK_LINE, ptIds)
+
+
+    def buildEdgeUVGrids(self, bounds_lon, bounds_lat):
+
+        ny, nx = self.ny, self.nx
+        numCells = ny * nx
+
+        # points, 4 points per cell, 3D
+        self.lonlat = numpy.zeros((ny, nx, 4, 3), numpy.float64)
+        self.lonlat[..., 0] = bounds_lon
+        self.lonlat[..., 1] = bounds_lat
+
+        self.pointData = vtk.vtkDoubleArray()
+        self.pointData.SetNumberOfComponents(3)
+        self.pointData.SetNumberOfTuples(4 * numCells)
+        self.pointData.SetVoidArray(self.lonlat, 4 * numCells * 3, 1)
+
+        self.points = vtk.vtkPoints()
+        self.points.SetData(self.pointData)
+
 
         # 1 grid for the U fluxes, 1 grid for the V fluxes
         self.gridU = vtk.vtkPolyData()
@@ -106,6 +116,9 @@ class FluxViz(object):
 
         self.minFlux = min(self.edgeFluxesUArray.min(), self.edgeFluxesVArray.min())
         self.maxFlux = min(self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
+
+        ptIds = vtk.vtkIdList()
+        ptIds.SetNumberOfIds(2)
 
         # assemble the cells
         cellId = 0
