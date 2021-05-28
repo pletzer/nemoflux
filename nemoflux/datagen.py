@@ -99,15 +99,18 @@ class DataGen(object):
         xyz1 = geo.lonLat2XYZArray(pp1, radius=geo.EARTH_RADIUS)
         xyz2 = geo.lonLat2XYZArray(pp2, radius=geo.EARTH_RADIUS)
         xyz3 = geo.lonLat2XYZArray(pp3, radius=geo.EARTH_RADIUS)
-
+        ds21 = geo.getArcLengthArray(xyz2, xyz1, radius=geo.EARTH_RADIUS)
+        ds23 = geo.getArcLengthArray(xyz2, xyz3, radius=geo.EARTH_RADIUS)
+        # cannot be zero (which is the case at the north pole)
+        numpy.clip(ds23, a_min=1.e-12, a_max=None, out=ds23)
         for t in range(self.nt):
             for k in range(self.nz):
                 dPhi21 = self.potential[t, k, ..., 2] - self.potential[t, k, ..., 1]
                 dPhi23 = self.potential[t, k, ..., 2] - self.potential[t, k, ..., 3]
-                # east, - d phi/ d xi_2, xi_2 is the parametric coord 2
-                self.u[t, k, ...] = - dPhi21
+                # east, - d phi/ d xi_2, xi_2 is the parametric coord 2, divide by ds to get vector component
+                self.u[t, k, ...] = - dPhi21 / ds21
                 # north, + d phi/ d xi_1, xi_1 is the parametric coord 1
-                self.v[t, k, ...] = + dPhi23
+                self.v[t, k, ...] = + dPhi23 / ds23
 
 
     def rotatePole(self, deltaDeg=(0., 0.)):
@@ -206,11 +209,11 @@ class DataGen(object):
         ncV.close()
 
 
-def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str, 
+def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str='test', 
             xmin: float=0.0, xmax: float=360., 
             ymin: float=-90., ymax: float=90.,
             zmin: float=0., zmax: float=1.0,
-            nx: int=10, ny: int=4, nz: int=5, nt: int=1, 
+            nx: int=36, ny: int=18, nz: int=1, nt: int=1, 
             deltaDeg: str="(0.,0.)"):
     """Generate data
     :param potentialFunction: potential expression of x (logical lon), y (logical lat), z (depth) and t (time index)

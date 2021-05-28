@@ -286,7 +286,7 @@ class FluxViz(object):
         self.title.SetPosition((0.6, 0.9))
 
         self.lut = vtk.vtkLookupTable()
-        self.lut.SetHueRange(0.667, 0.) #(0.6, 0.07)
+        self.lut.SetHueRange(0.6, 0.07)
         self.lut.SetTableRange(self.minFlux, self.maxFlux)
         self.lut.Build()
 
