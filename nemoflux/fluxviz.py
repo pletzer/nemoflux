@@ -279,6 +279,8 @@ class FluxViz(object):
 
     def show(self, npx=1260, npy=960):
 
+        print(f'integrated velocity on edge 0: {self.integratedVelocity[...,0]}')
+        print(f'integrated velocity on edge 2: {self.integratedVelocity[...,2]}')
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
         self.title = vtk.vtkTextActor()
         self.title.SetTextScaleMode(0)
