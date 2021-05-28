@@ -26,6 +26,8 @@ def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*p
     zbot  = numpy.array([zmin + (k + 1  )*dz for k in range(nz)])
     thickness = -(ztop - zbot) # DEPTH HAS OPPOSITE SIGN TO Z
 
+    # SHOULD WE APPLY ROTATION?
+
     xyBeg = xyVals[0, :]
     xyEnd = xyVals[-1, :]
     print(f'beg/end target points: {xyBeg} {xyEnd}')
@@ -40,6 +42,7 @@ def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*p
             x, y = xyEnd[:2]
             phiB = eval(potentialFunction)
             flux += (phiB - phiA) * thickness[k]
+        # print total flux
         print(f'{t:10d} {flux:20.10g}')
 
 

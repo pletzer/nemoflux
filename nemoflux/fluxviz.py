@@ -41,7 +41,7 @@ class FluxViz(object):
 
         self.thickness = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
 
-        uo, vo = self.getUV()
+        uVerticallyIntegrated, vVerticallyIntegrated = self.getUV()
 
         self.edgeFluxesUArray = numpy.zeros((numCells,), numpy.float64)
         self.edgeFluxesVArray = numpy.zeros((numCells,), numpy.float64)
@@ -49,7 +49,8 @@ class FluxViz(object):
         numCells = self.ny * self.nx
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
         self.minFlux, self.maxFlux = +float('inf'), -float('inf')
-        self.computeIntegratedFlux(uo, vo)
+
+        self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
 
         self.buildTargetLineGrid(lonLatPoints)
         self.buildEdgeUVGrids(bounds_lon, bounds_lat)
@@ -210,13 +211,13 @@ class FluxViz(object):
         vo = numpy.ma.filled(vo, 0.0)
 
         # integrate vertically, multiplying by the thickness of the layers
-        uo = numpy.tensordot(self.thickness, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
-        vo = numpy.tensordot(self.thickness, vo, axes=(0, 0))
+        uVerticallyIntegrated = numpy.tensordot(self.thickness, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
+        vVerticallyIntegrated = numpy.tensordot(self.thickness, vo, axes=(0, 0))
 
-        return uo, vo
+        return uVerticallyIntegrated, vVerticallyIntegrated
 
 
-    def computeIntegratedFlux(self, uo, vo):
+    def computeIntegratedFlux(self, uVerticallyIntegrated, vVerticallyIntegrated):
 
         numCells = self.ny * self.nx
 
@@ -244,20 +245,20 @@ class FluxViz(object):
         #  0-----------1
 
         # south
-        integratedVelocity[1:, :, 0] = vo[:-1, :] * ds01[:-1, :]
+        integratedVelocity[1:, :, 0] = vVerticallyIntegrated[:-1, :] * ds01[:-1, :]
         # else:
         #     # folding, assuming even nx
         #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
 
         # east
-        integratedVelocity[..., 1] = uo * ds12
+        integratedVelocity[..., 1] = uVerticallyIntegrated * ds12
 
         # north
-        integratedVelocity[..., 2] = vo * ds32
+        integratedVelocity[..., 2] = vVerticallyIntegrated * ds32
 
         # periodic west
-        integratedVelocity[:, 1:, 3] = uo[:, :-1] * ds03[:, :-1]
-        integratedVelocity[:, 0, 3] = uo[:, -1] * ds03[:, -1]
+        integratedVelocity[:, 1:, 3] = uVerticallyIntegrated[:, :-1] * ds03[:, :-1]
+        integratedVelocity[:, 0, 3] = uVerticallyIntegrated[:, -1] * ds03[:, -1]
 
         # array should have shape (numCells, 4)
         self.integratedVelocity = integratedVelocity.reshape((numCells, 4))
@@ -282,7 +283,7 @@ class FluxViz(object):
         self.title = vtk.vtkTextActor()
         self.title.SetTextScaleMode(0)
         self.title.GetTextProperty().SetFontSize(50)
-        self.title.SetInput(f"total flux = {totalFlux:10.3f} @ time {self.timeIndex}")
+        self.title.SetInput(f"total flux = {totalFlux:15.8g} @ time {self.timeIndex}")
         self.title.SetPosition((0.6, 0.9))
 
         self.lut = vtk.vtkLookupTable()

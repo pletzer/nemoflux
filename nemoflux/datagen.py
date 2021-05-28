@@ -201,7 +201,6 @@ class DataGen(object):
         ncV.createDimension('y', self.ny)
         ncV.createDimension('x', self.nx)
         ncV.createDimension('axis_nbounds', 2)
-        depthv = ncU.createVariable('depthv', REAL, ('z',))
         vo = ncV.createVariable('vo', REAL, ('t', 'z', 'y', 'x'), fill_value=1.e20)
         vo.standard_name = 'sea_water_y_velocity'
         vo.units = 'm/s'
