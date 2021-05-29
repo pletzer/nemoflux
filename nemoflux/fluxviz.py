@@ -49,12 +49,12 @@ class FluxViz(object):
         self.edgeFluxesUArray = numpy.zeros((numCells,), numpy.float64)
         self.edgeFluxesVArray = numpy.zeros((numCells,), numpy.float64)
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
-        self.minFlux, self.maxFlux = +float('inf'), -float('inf')
+        self.maxAbsFlux = 0.
 
         # read/get the staggered field integrated over the depth
         uVerticallyIntegrated, vVerticallyIntegrated = self.getUV()
         self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
-        print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
+        print(f'max vertically integrated edge |flux|: {self.maxAbsFlux}')
 
         self.buildTargetLineGrid(lonLatPoints)
         self.buildEdgeUVGrids(bounds_lon, bounds_lat)
@@ -74,7 +74,7 @@ class FluxViz(object):
         self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
 
         # update the pipeline
-        self.lut.SetTableRange(self.minFlux, self.maxFlux)
+        self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
         self.lut.Modified()
         self.cbar.Modified()
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
@@ -82,7 +82,7 @@ class FluxViz(object):
         self.title.Modified()
         self.edgeFluxesU.Modified()
         self.edgeFluxesV.Modified()
-        print(f'time index is now {self.timeIndex} min/max flux: {self.minFlux:10.3f}/{self.maxFlux:10.3f} nt = {self.nt}')
+        print(f'time index now {self.timeIndex} max |flux|: {self.maxAbsFlux:10.3f} nt = {self.nt}')
 
 
     def getSizes(self):
@@ -270,8 +270,9 @@ class FluxViz(object):
         # periodic BCs
         iV[:, 0, 3] = eU[:, -1]
 
-        self.minFlux = min(self.minFlux, self.edgeFluxesUArray.min(), self.edgeFluxesVArray.min())
-        self.maxFlux = max(self.maxFlux, self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
+        self.maxAbsFlux = max(self.maxAbsFlux, 
+                              numpy.fabs(self.edgeFluxesUArray.min()), numpy.fabs(self.edgeFluxesUArray.max()),
+                              numpy.fabs(self.edgeFluxesVArray.min()), numpy.fabs(self.edgeFluxesVArray.max()))
 
 
     def show(self, npx=1260, npy=960):
@@ -285,13 +286,11 @@ class FluxViz(object):
 
         self.lut = vtk.vtkLookupTable()
         self.lut.SetHueRange(0.6, 0.07)
-        self.lut.SetTableRange(self.minFlux, self.maxFlux)
+        self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
         self.lut.Build()
 
         self.cbar = vtk.vtkScalarBarActor()
         self.cbar.SetLookupTable(self.lut)
-
-        radiusMin = 0.05*min(360/self.nx, 180/self.ny)
 
         self.mapperU = vtk.vtkPolyDataMapper()
         self.mapperU.SetInputData(self.gridU)
@@ -308,7 +307,7 @@ class FluxViz(object):
         self.actorV.SetMapper(self.mapperV)
 
         self.tubePoints = vtk.vtkTubeFilter()
-        self.tubePoints.SetRadius(2.0)
+        self.tubePoints.SetRadius(0.05)
         self.tubePoints.SetInputData(self.gridTargetLine)
         self.mapperPoints = vtk.vtkPolyDataMapper()
         self.mapperPoints.SetInputConnection(self.tubePoints.GetOutputPort())
