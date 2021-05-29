@@ -267,7 +267,8 @@ class FluxViz(object):
         iV[1:, :, 0] = eV[:-1, :] # will set self.integratedVelocity on the south side
         # west
         iV[:, 1:, 3] = eU[:, :-1]
-        # NEED TO ADD PERIODIC BCs???
+        # periodic BCs
+        iV[:, 0, 3] = eU[:, -1]
 
         self.minFlux = min(self.minFlux, self.edgeFluxesUArray.min(), self.edgeFluxesVArray.min())
         self.maxFlux = max(self.maxFlux, self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
