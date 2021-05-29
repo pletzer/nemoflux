@@ -6,6 +6,7 @@ import numpy
 from horizgrid import HorizGrid
 import mint
 
+# callback class called when the user interacts with the visualization
 class CallBack(object):
 
     def __init__(self, fluxviz):
@@ -26,7 +27,6 @@ class FluxViz(object):
         self.ncV = netCDF4.Dataset(vFile)
 
         self.nt, self.nz, self.ny, self.nx = self.getSizes()
-        numCells = self.ny * self.nx
 
         self.gr = HorizGrid(tFile)
         self.pli = mint.PolylineIntegral()
@@ -41,34 +41,39 @@ class FluxViz(object):
 
         self.thickness = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
 
-        uVerticallyIntegrated, vVerticallyIntegrated = self.getUV()
+        numCells = self.ny * self.nx
+        self.arcLengths = numpy.zeros((numCells, 4), numpy.float64)
+        self.computeArcLengths()
 
+        # compute the edge fluxes from the vector fields
         self.edgeFluxesUArray = numpy.zeros((numCells,), numpy.float64)
         self.edgeFluxesVArray = numpy.zeros((numCells,), numpy.float64)
-
-        numCells = self.ny * self.nx
         self.integratedVelocity = numpy.zeros((numCells, 4), numpy.float64)
         self.minFlux, self.maxFlux = +float('inf'), -float('inf')
 
+        # read/get the staggered field integrated over the depth
+        uVerticallyIntegrated, vVerticallyIntegrated = self.getUV()
         self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
+        print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
 
         self.buildTargetLineGrid(lonLatPoints)
         self.buildEdgeUVGrids(bounds_lon, bounds_lat)
-        print(f'min/max vertically integrated edge flux: {self.minFlux}/{self.maxFlux}')
 
 
     def update(self, key):
+
         if key == 't':
             # forward in time
             self.timeIndex = (self.timeIndex + 1) % self.nt
         elif key == 'b':
             # backward in time
             self.timeIndex = (self.timeIndex - 1) % self.nt
+
         # update the data
-        uo, vo = self.getUV()
-        self.computeIntegratedFlux(uo, vo)
-        self.edgeFluxesUArray[:] = self.integratedVelocity[:, 1]
-        self.edgeFluxesVArray[:] = self.integratedVelocity[:, 2]
+        uVerticallyIntegrated, vVerticallyIntegrated = self.getUV()
+        self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
+
+        # update the pipeline
         self.lut.SetTableRange(self.minFlux, self.maxFlux)
         self.lut.Modified()
         self.cbar.Modified()
@@ -183,85 +188,50 @@ class FluxViz(object):
                 # increment the cell counter
                 cellId += 1
 
-
-    def getUV(self):
+    def readField(self, nc, filedName):
 
         # read u
         try:
-            uo = self.ncU.variables['uo'][self.timeIndex, :, :, :]
+            field = nc.variables[filedName][self.timeIndex, :, :, :]
         except:
             try:
-                uo = self.ncU.variables['uo'][...]
+                field = nc.variables[filedName][...]
             except:
-                raise RuntimeError('ERROR: could not read u field')
+                raise RuntimeError(f'ERROR: could not read {filedName} field')
 
-        # set the velocity to zero where missing
-        uo = numpy.ma.filled(uo, 0.0)
-
-        # read v
-        try:
-            vo = self.ncV.variables['vo'][self.timeIndex, :, :, :]
-        except:
-            try:
-                vo = self.ncV.variables['vo'][...]
-            except:
-                raise RuntimeError('ERROR: could not read v field')
-
-        # set the velocity to zero where missing
-        vo = numpy.ma.filled(vo, 0.0)
+        # set to zero where missing
+        field = numpy.ma.filled(field, 0.0)
 
         # integrate vertically, multiplying by the thickness of the layers
-        uVerticallyIntegrated = numpy.tensordot(self.thickness, uo, axes=(0, 0)) # sum of multiplying axis 0 of dz with axis 0 of uo
-        vVerticallyIntegrated = numpy.tensordot(self.thickness, vo, axes=(0, 0))
+        # sum of multiplying axis 0 of thickness with axis 0 of field...
+        fieldVerticallyIntegrated = numpy.tensordot(self.thickness, field, axes=(0, 0)) 
 
+        return fieldVerticallyIntegrated
+
+
+    def getUV(self):
+        uVerticallyIntegrated = self.readField(self.ncU, 'uo')
+        vVerticallyIntegrated = self.readField(self.ncV, 'vo')
         return uVerticallyIntegrated, vVerticallyIntegrated
+
+
+    def computeArcLengths(self):
+
+        # lon, lat, elev coords
+        points = self.gr.getPoints() # array of size (numCells, 4, 3)
+
+        # convert to Cartesian
+        xyz = geo.lonLat2XYZArray(points, radius=geo.EARTH_RADIUS) # array of size (numCells, 4, 3)
+
+        # compute the arc lengths
+        for i0 in range(4):
+            i1 = (i0 + 1) % 4
+            self.arcLengths[:, i0] = geo.getArcLengthArray(xyz[:, i0, :], xyz[:, i1, :], radius=geo.EARTH_RADIUS)
 
 
     def computeIntegratedFlux(self, uVerticallyIntegrated, vVerticallyIntegrated):
 
         numCells = self.ny * self.nx
-
-        integratedVelocity = self.integratedVelocity.reshape((self.ny, self.nx, 4))
-
-        # now compute the integrated flux, cell by cell
-        points = self.gr.getPoints().reshape((self.ny, self.nx, 4, 3))
-        xyz0 = geo.lonLat2XYZArray(points[:, :, 0, :], radius=geo.EARTH_RADIUS)
-        xyz1 = geo.lonLat2XYZArray(points[:, :, 1, :], radius=geo.EARTH_RADIUS)
-        xyz2 = geo.lonLat2XYZArray(points[:, :, 2, :], radius=geo.EARTH_RADIUS)
-        xyz3 = geo.lonLat2XYZArray(points[:, :, 3, :], radius=geo.EARTH_RADIUS)
-
-        ds01 = geo.getArcLengthArray(xyz0, xyz1, radius=geo.EARTH_RADIUS)
-        ds12 = geo.getArcLengthArray(xyz1, xyz2, radius=geo.EARTH_RADIUS)
-        ds32 = geo.getArcLengthArray(xyz3, xyz2, radius=geo.EARTH_RADIUS)
-        ds03 = geo.getArcLengthArray(xyz0, xyz3, radius=geo.EARTH_RADIUS)
-
-        #        ^
-        #        |
-        #  3-----V-----2
-        #  |           |
-        #  |->   T     U->
-        #  |     ^     |
-        #  |     |     |
-        #  0-----------1
-
-        # south
-        integratedVelocity[1:, :, 0] = vVerticallyIntegrated[:-1, :] * ds01[:-1, :]
-        # else:
-        #     # folding, assuming even nx
-        #     self.integratedVelocity[cellId, 0] = vo[:, j, (i+nx//2)%nx] * ds01
-
-        # east
-        integratedVelocity[..., 1] = uVerticallyIntegrated * ds12
-
-        # north
-        integratedVelocity[..., 2] = vVerticallyIntegrated * ds32
-
-        # periodic west
-        integratedVelocity[:, 1:, 3] = uVerticallyIntegrated[:, :-1] * ds03[:, :-1]
-        integratedVelocity[:, 0, 3] = uVerticallyIntegrated[:, -1] * ds03[:, -1]
-
-        # array should have shape (numCells, 4)
-        self.integratedVelocity = integratedVelocity.reshape((numCells, 4))
 
         #        ^
         #        |
@@ -270,8 +240,34 @@ class FluxViz(object):
         #  |     T     U-->
         #  |           |
         #  0-----------1
-        self.edgeFluxesUArray[:] = self.integratedVelocity[:, 1]
-        self.edgeFluxesVArray[:] = self.integratedVelocity[:, 2]
+
+        self.edgeFluxesUArray[:] = uVerticallyIntegrated.reshape((numCells,)) * self.arcLengths[:, 1]
+        self.edgeFluxesVArray[:] = vVerticallyIntegrated.reshape((numCells,)) * self.arcLengths[:, 2]
+
+        #        2
+        #        ^
+        #        |
+        #  3-----V-----2
+        #  |           |
+        #  |->3  0     U->1
+        #  |     ^     |
+        #  |     |     |
+        #  0-----------1
+
+        # east
+        self.integratedVelocity[:, 1] = self.edgeFluxesUArray
+        # north
+        self.integratedVelocity[:, 2] = self.edgeFluxesVArray
+
+        # these should provide a different view to the array, NOT A COPY
+        eU = self.edgeFluxesUArray.reshape((self.ny, self.nx))
+        eV = self.edgeFluxesVArray.reshape((self.ny, self.nx))
+        iV = self.integratedVelocity.reshape((self.ny, self.nx, 4))
+        # south, (ny, nx, 4)
+        iV[1:, :, 0] = eV[:-1, :] # will set self.integratedVelocity on the south side
+        # west
+        iV[:, 1:, 3] = eU[:, :-1]
+        # NEED TO ADD PERIODIC BCs???
 
         self.minFlux = min(self.minFlux, self.edgeFluxesUArray.min(), self.edgeFluxesVArray.min())
         self.maxFlux = max(self.maxFlux, self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
@@ -279,8 +275,6 @@ class FluxViz(object):
 
     def show(self, npx=1260, npy=960):
 
-        print(f'integrated velocity on edge 0: {self.integratedVelocity[...,0]}')
-        print(f'integrated velocity on edge 2: {self.integratedVelocity[...,2]}')
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
         self.title = vtk.vtkTextActor()
         self.title.SetTextScaleMode(0)

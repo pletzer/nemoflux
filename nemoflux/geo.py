@@ -23,8 +23,8 @@ def lonLat2XYZArray(p, radius):
 
 def getArcLengthArray(xyzA, xyzB, radius=EARTH_RADIUS):
     radiusSquare = radius*radius
-    angle = numpy.arccos(  numpy.sum(xyzA*xyzB, axis=2) / radiusSquare )
-    return abs(radius * angle)
+    angle = numpy.arccos(  numpy.sum(xyzA*xyzB, axis=-1) / radiusSquare )
+    return numpy.fabs(radius * angle)
 
 def getArcLength(xyzA, xyzB, radius=EARTH_RADIUS):
     return abs( radius * numpy.arccos( xyzA.dot(xyzB)/radius**2 ) )

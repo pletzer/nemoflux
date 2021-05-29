@@ -209,7 +209,7 @@ class DataGen(object):
 
 
 def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str='test', 
-            xmin: float=0.0, xmax: float=360., 
+            xmin: float=-180., xmax: float=180., 
             ymin: float=-90., ymax: float=90.,
             zmin: float=0., zmax: float=1.0,
             nx: int=36, ny: int=18, nz: int=1, nt: int=1, 
@@ -233,7 +233,10 @@ def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*p
     lldg.setSizes(nx, ny, nz, nt)
     lldg.setBoundingBox(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax)
     lldg.build()
-    lldg.rotatePole(deltaDeg=eval(deltaDeg))
+    deltaDeg = eval(deltaDeg)
+    if deltaDeg[0] != 0 or deltaDeg[1] != 0:
+        # the rotatePole function does not work at lon = 0 if there is no displacement
+        lldg.rotatePole(deltaDeg=deltaDeg)
     lldg.applyPotential(potentialFunction)
     lldg.computeUVFromPotential()
     lldg.save()
