@@ -290,7 +290,7 @@ class FluxViz(object):
         for i in range(nc1):
             x = i*numpy.pi/float(nc1-1)
             r = 0.5 - 0.5*numpy.cos(x)
-            g = 0.5 + 0.5*numpy.sin(2*x)
+            g = 0.5 + 0.5*numpy.sin(x)
             b = 0.5 + 0.5*numpy.cos(x)
             a = 0.5 + max(0., 0.5*numpy.cos(x)**2)
             self.lut.SetTableValue(i, r, g, b, a)
