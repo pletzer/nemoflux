@@ -338,7 +338,7 @@ class FluxViz(object):
             # r = 0.5 - 0.5*numpy.cos(x*numpy.pi)
             # g = 0.5 + 0.5*numpy.sin(2*x*numpy.pi)
             # b = 0.5 + 0.5*numpy.cos(x*numpy.pi)
-            a = 0.1 + max(0., (1.-0.1)*numpy.cos(x*numpy.pi)**2)
+            a = 0.4 + max(0., (1.-0.4)*numpy.cos(x*numpy.pi)**2)
             self.lut.SetTableValue(i, r, g, b, a)
         self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
         self.lut.Build()
