@@ -113,7 +113,7 @@ class FluxViz(object):
         self.lut.Modified()
         self.cbar.Modified()
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
-        self.title.SetInput(f'total flux: {totalFlux:10.3f} @ time {self.timeIndex}')
+        self.title.SetInput(f'flux = {totalFlux:6.3g}*A m^/s3 @ time {self.timeIndex}')
         self.title.Modified()
         self.edgeFluxesU.Modified()
         self.edgeFluxesV.Modified()
@@ -316,29 +316,30 @@ class FluxViz(object):
         self.title = vtk.vtkTextActor()
         self.title.SetTextScaleMode(0)
         self.title.GetTextProperty().SetFontSize(50)
-        self.title.SetInput(f"total flux = {totalFlux:15.8g} @ time {self.timeIndex}")
+        self.title.SetInput(f"flux = {totalFlux:10.3g}*A m^3/s @ time {self.timeIndex}")
         self.title.SetPosition((0.6, 0.9))
 
         self.lut = vtk.vtkLookupTable()
-        nc1 = 41
+        nc1 = 10001
         self.lut.SetNumberOfTableValues(nc1)
         for i in range(nc1):
             x = float(i)/float(nc1-1)
             g = 0.5 + 0.5*numpy.cos(x*2*numpy.pi)
-            if x < 0.45:
+            a = 0.2 + max(0., (1.-0.2)*numpy.cos(x*numpy.pi)**2)
+            if x < 0.499999:
+                # negative
                 r = 0.
                 b = 1.
-            elif x > 0.55:
+            elif x > 0.500001:
+                # positive
                 r = 1.
                 b = 0.
             else:
-                r = 0.5
-                b = 0.5
-                g = 0.5
-            # r = 0.5 - 0.5*numpy.cos(x*numpy.pi)
-            # g = 0.5 + 0.5*numpy.sin(2*x*numpy.pi)
-            # b = 0.5 + 0.5*numpy.cos(x*numpy.pi)
-            a = 0.4 + max(0., (1.-0.4)*numpy.cos(x*numpy.pi)**2)
+                # land or zero velocity
+                r = 0.8
+                g = 0.8
+                b = 0.7
+                a = 1.0
             self.lut.SetTableValue(i, r, g, b, a)
         self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
         self.lut.Build()
