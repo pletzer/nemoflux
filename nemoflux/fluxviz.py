@@ -39,9 +39,16 @@ class FluxViz(object):
             bounds_lon = nc.variables['bounds_lon'][:]
             self.bounds_depth = nc.variables['deptht_bounds'][:]
 
+        self.lonmin = bounds_lon.min()
+        self.lonmax = bounds_lon.max()
+        self.latmin = bounds_lat.min()
+        self.latmax = bounds_lat.max()
+        print(f'lon-lat box: {self.lonmin}, {self.latmin} -> {self.lonmax}, {self.latmax}')
+
         self.thickness = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
 
         numCells = self.ny * self.nx
+        self.dx = min((self.lonmax - self.lonmin)/float(self.nx), (self.latmax - self.latmin)/float(self.ny))
         self.arcLengths = numpy.zeros((numCells, 4), numpy.float64)
         self.computeArcLengths()
 
@@ -62,12 +69,40 @@ class FluxViz(object):
 
     def update(self, key):
 
+        camera = self.ren.GetActiveCamera()
+        x, y, z = camera.GetPosition()
+
         if key == 't':
             # forward in time
             self.timeIndex = (self.timeIndex + 1) % self.nt
-        elif key == 'b':
+        elif key == 'T':
             # backward in time
             self.timeIndex = (self.timeIndex - 1) % self.nt
+        else:
+            if key == 'r':
+                # reset 
+                lon, lat = 0.5*(self.lonmin + self.lonmax), 0.5*(self.latmin + self.latmax)
+                camera.SetFocalPoint((lon, lat, 0.))
+                camera.SetPosition((lon, lat, 2*self.dx*max(self.ny, self.nx)))
+                camera.SetViewUp((0., 1., 0.))
+            elif  key == 'x':
+                camera.SetPosition(x + self.dx, y, z)
+                camera.SetFocalPoint(x + self.dx, y, 0.)
+            elif key == 'X':
+                camera.SetPosition(x - self.dx, y, z)
+                camera.SetFocalPoint(x - self.dx, y, 0.)                
+            elif key == 'y':
+                camera.SetPosition(x, y + self.dx, z)
+                camera.SetFocalPoint(x, y + self.dx, 0.)
+            elif key == 'Y':
+                camera.SetPosition(x, y - self.dx, z)
+                camera.SetFocalPoint(x, y - self.dx, 0.)
+            elif key == 'z':
+                camera.SetPosition(x, y, z + self.dx)
+            elif key == 'Z':
+                camera.SetPosition(x, y, z - self.dx)
+            camera.Modified()
+            return
 
         # update the data
         uVerticallyIntegrated, vVerticallyIntegrated = self.getUV()
@@ -288,11 +323,22 @@ class FluxViz(object):
         nc1 = 41
         self.lut.SetNumberOfTableValues(nc1)
         for i in range(nc1):
-            x = i*numpy.pi/float(nc1-1)
-            r = 0.5 - 0.5*numpy.cos(x)
-            g = 0.5 + 0.5*numpy.sin(x)
-            b = 0.5 + 0.5*numpy.cos(x)
-            a = 0.5 + max(0., 0.5*numpy.cos(x)**2)
+            x = float(i)/float(nc1-1)
+            g = 0.5 + 0.5*numpy.cos(x*2*numpy.pi)
+            if x < 0.45:
+                r = 0.
+                b = 1.
+            elif x > 0.55:
+                r = 1.
+                b = 0.
+            else:
+                r = 0.5
+                b = 0.5
+                g = 0.5
+            # r = 0.5 - 0.5*numpy.cos(x*numpy.pi)
+            # g = 0.5 + 0.5*numpy.sin(2*x*numpy.pi)
+            # b = 0.5 + 0.5*numpy.cos(x*numpy.pi)
+            a = 0.1 + max(0., (1.-0.1)*numpy.cos(x*numpy.pi)**2)
             self.lut.SetTableValue(i, r, g, b, a)
         self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
         self.lut.Build()
@@ -300,27 +346,50 @@ class FluxViz(object):
         self.cbar = vtk.vtkScalarBarActor()
         self.cbar.SetLookupTable(self.lut)
 
+        self.tubesU = vtk.vtkTubeFilter()
+        self.tubesU.SetRadius(self.dx * 0.5)
+        self.tubesU.SetNumberOfSides(16)
+        self.tubesU.SetInputData(self.gridU)
         self.mapperU = vtk.vtkPolyDataMapper()
-        self.mapperU.SetInputData(self.gridU)
+        self.mapperU.SetInputConnection(self.tubesU.GetOutputPort())
         self.mapperU.SetLookupTable(self.lut)
         self.mapperU.SetUseLookupTableScalarRange(1)
         self.actorU = vtk.vtkActor()
         self.actorU.SetMapper(self.mapperU)
+        self.actorU.GetProperty().SetInterpolationToPhong()
 
+        self.tubesV = vtk.vtkTubeFilter()
+        self.tubesV.SetRadius(self.dx * 0.5)
+        self.tubesV.SetNumberOfSides(16)
+        self.tubesV.SetInputData(self.gridV)
         self.mapperV = vtk.vtkPolyDataMapper()
-        self.mapperV.SetInputData(self.gridV)
+        self.mapperV.SetInputConnection(self.tubesV.GetOutputPort())
         self.mapperV.SetLookupTable(self.lut)
         self.mapperV.SetUseLookupTableScalarRange(1)
         self.actorV = vtk.vtkActor()
         self.actorV.SetMapper(self.mapperV)
+        self.actorV.GetProperty().SetInterpolationToPhong()
 
         self.tubePoints = vtk.vtkTubeFilter()
-        self.tubePoints.SetRadius(0.05)
+        self.tubePoints.SetRadius(self.dx * 0.5)
         self.tubePoints.SetInputData(self.gridTargetLine)
         self.mapperPoints = vtk.vtkPolyDataMapper()
         self.mapperPoints.SetInputConnection(self.tubePoints.GetOutputPort())
         self.actorPoints = vtk.vtkActor()
         self.actorPoints.SetMapper(self.mapperPoints)
+
+        # add a cone to show the direction
+        self.cone = vtk.vtkConeSource()
+        self.cone.SetRadius(self.dx * 2.0)
+        pc = 0.1*self.lonLatPoints[-2, :] + 0.9*self.lonLatPoints[-1, :]
+        u = self.lonLatPoints[-1, :] - self.lonLatPoints[-2, :]
+        self.cone.SetCenter(pc)
+        self.cone.SetDirection(u)
+        self.cone.SetHeight(numpy.sqrt(0.05*u.dot(u)))
+        self.coneMapper = vtk.vtkPolyDataMapper()
+        self.coneMapper.SetInputConnection(self.cone.GetOutputPort())
+        self.coneActor = vtk.vtkActor()
+        self.coneActor.SetMapper(self.coneMapper)
 
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
@@ -338,14 +407,20 @@ class FluxViz(object):
         self.ren.AddActor(self.actorPoints)
         self.ren.AddActor(self.cbar)
         self.ren.AddActor(self.title)
-        self.ren.SetBackground((0.1, 0.1, 0.1))
+        self.ren.AddActor(self.coneActor)
+        self.ren.SetBackground((0., 0., 0.))
+        camera = self.ren.GetActiveCamera()
+        lon, lat = 0.5*(self.lonmin + self.lonmax), 0.5*(self.latmin + self.latmax)
+        camera.SetFocalPoint((lon, lat, 0.))
+        camera.SetPosition((lon, lat, 2*self.dx*max(self.ny, self.nx)))
+        camera.SetViewUp((0., 1., 0.))
         self.renWin.SetSize(npx, npy)
         self.renWin.SetWindowName('Vertically integrated edge flux')
 
         # allow the user to interact with the visualisation
         self.callBack = CallBack(self)
         self.iren.AddObserver('KeyPressEvent', self.callBack.execute)
-        print('type "t"/"b" to step forward/backward in time')
+        print('type "t" to step forward in time')
 
         # This allows the interactor to initalize itself. It has to be
         # called before an event loop.
