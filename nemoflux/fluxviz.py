@@ -70,7 +70,7 @@ class FluxViz(object):
 
         # create a polyline grid along the target points and place vectors on them
         vectorPoints = []
-        uVectors = []
+        self.uVectors = []
         for i in range(len(lonLatPoints) - 1):
             begPoint = lonLatPoints[i]
             endPoint = lonLatPoints[i + 1]
@@ -82,7 +82,7 @@ class FluxViz(object):
             vdx = distance / float(nvpts - 1)
             for j in range(nvpts):
                 vectorPoints.append(begPoint + u*j*vdx)
-                uVectors.append(u)
+                self.uVectors.append(u)
         self.vectorPoints = numpy.array(vectorPoints)
 
         # compute the vector at the target line
@@ -96,7 +96,7 @@ class FluxViz(object):
         numTargetPoints = len(vectorValues)
         # project the vectors on the target line, then rotate using zhat x product
         self.vectorValues = numpy.array([numpy.cross(zhat, \
-                            uVectors[i] * vectorValues[i, :].dot(uVectors[i])) \
+                            self.uVectors[i] * vectorValues[i, :].dot(self.uVectors[i])) \
                             for i in range(numTargetPoints)])
 
     def update(self, key):
@@ -138,7 +138,17 @@ class FluxViz(object):
 
         # update the data
         uVerticallyIntegrated, vVerticallyIntegrated = self.getUV()
+        # this will update self.integratedVelocity
         self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
+
+        vectorValues = self.vinterp.getVectors(self.integratedVelocity)
+        # need to rotate the vectors
+        zhat = numpy.array([0., 0., 1.], numpy.float64)
+        numTargetPoints = len(vectorValues)
+        # project the vectors on the target line, then rotate using zhat x product
+        self.vectorValues[:] = numpy.array([numpy.cross(zhat, \
+                                           self.uVectors[i] * vectorValues[i, :].dot(self.uVectors[i])) \
+                                           for i in range(numTargetPoints)])
 
         # update the pipeline
         self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
@@ -149,6 +159,7 @@ class FluxViz(object):
         self.title.Modified()
         self.edgeFluxesU.Modified()
         self.edgeFluxesV.Modified()
+        self.targetVectorValues.Modified()
         print(f'time index now {self.timeIndex} max |flux|: {self.maxAbsFlux:10.3f} nt = {self.nt}')
 
 
@@ -380,7 +391,7 @@ class FluxViz(object):
         self.cbar.SetLookupTable(self.lut)
 
         self.tubesU = vtk.vtkTubeFilter()
-        self.tubesU.SetRadius(self.dx * 0.1)
+        self.tubesU.SetRadius(self.dx * 0.2)
         self.tubesU.SetNumberOfSides(16)
         self.tubesU.SetInputData(self.gridU)
         self.mapperU = vtk.vtkPolyDataMapper()
@@ -392,7 +403,7 @@ class FluxViz(object):
         self.actorU.GetProperty().SetInterpolationToPhong()
 
         self.tubesV = vtk.vtkTubeFilter()
-        self.tubesV.SetRadius(self.dx * 0.1)
+        self.tubesV.SetRadius(self.dx * 0.2)
         self.tubesV.SetNumberOfSides(16)
         self.tubesV.SetInputData(self.gridV)
         self.mapperV = vtk.vtkPolyDataMapper()
@@ -427,6 +438,8 @@ class FluxViz(object):
 
         self.targetVectorPointData.SetNumberOfComponents(3)
         self.targetVectorPointData.SetNumberOfTuples(nvpts)
+        # move the point a little up for visualization
+        self.vectorPoints[:, 2] = 0.01
         self.targetVectorPointData.SetVoidArray(self.vectorPoints, nvpts*3, 1)
         self.targetVectorPoints.SetNumberOfPoints(nvpts)
         self.targetVectorPoints.SetData(self.targetVectorPointData)
