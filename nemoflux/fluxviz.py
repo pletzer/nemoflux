@@ -70,9 +70,7 @@ class FluxViz(object):
 
         # create a polyline grid along the target points and place vectors on them
         vectorPoints = []
-        uVectors = []
-        npts = len(lonLatPoints)
-        for i in range(npts - 1):
+        for i in range(len(lonLatPoints) - 1):
             begPoint = lonLatPoints[i]
             endPoint = lonLatPoints[i + 1]
             u = endPoint - begPoint
@@ -83,7 +81,6 @@ class FluxViz(object):
             vdx = distance / float(nvpts - 1)
             for j in range(nvpts):
                 vectorPoints.append(begPoint + u*j*vdx)
-                uVectors.append(u)
         self.vectorPoints = numpy.array(vectorPoints)
 
         # compute the vector at the target line
@@ -92,11 +89,9 @@ class FluxViz(object):
         self.vinterp.buildLocator(numCellsPerBucket=128, periodX=360.)
         self.vinterp.findPoints(self.vectorPoints, tol2=1.e-12)
         vectorValues = self.vinterp.getVectors(self.integratedVelocity)
-        numTargetPoints = len(vectorValues)
         # need to rotate the vectors
         zhat = numpy.array([0., 0., 1.], numpy.float64)
-        self.vectorValues = numpy.array([numpy.cross(zhat, vectorValues[i].dot(uVectors[i])) \
-                                         for i in rangle(numTargetPoints)])
+        self.vectorValues = numpy.array([numpy.cross(zhat, v) for v in vectorValues])
 
     def update(self, key):
 
