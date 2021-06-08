@@ -5,6 +5,7 @@ import defopt
 import numpy
 from horizgrid import HorizGrid
 import mint
+from latlonreader import LatLonReader
 
 # callback class called when the user interacts with the visualization
 class CallBack(object):
@@ -22,17 +23,6 @@ class FluxViz(object):
 
     def __init__(self, tFile, uFile, vFile, lonLatPoints):
 
-        self.timeIndex = 0
-        self.ncU = netCDF4.Dataset(uFile)
-        self.ncV = netCDF4.Dataset(vFile)
-
-        self.nt, self.nz, self.ny, self.nx = self.getSizes()
-
-        self.gr = HorizGrid(tFile)
-        self.pli = mint.PolylineIntegral()
-        self.pli.build(self.gr.getMintGrid(), lonLatPoints,
-                       counterclock=False, periodX=360.0)
-
         # read the cell bounds
         with netCDF4.Dataset(tFile) as nc:
             bounds_lat = nc.variables['bounds_lat'][:]
@@ -44,6 +34,18 @@ class FluxViz(object):
         self.latmin = bounds_lat.min()
         self.latmax = bounds_lat.max()
         print(f'lon-lat box: {self.lonmin}, {self.latmin} -> {self.lonmax}, {self.latmax}')
+
+        self.timeIndex = 0
+        self.ncU = netCDF4.Dataset(uFile)
+        self.ncV = netCDF4.Dataset(vFile)
+
+        self.nt, self.nz, self.ny, self.nx = self.getSizes()
+
+        self.gr = HorizGrid(tFile)
+        self.pli = mint.PolylineIntegral()
+        self.pli.build(self.gr.getMintGrid(), lonLatPoints,
+                       counterclock=False, periodX=360.0)
+
 
         self.thickness = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
 
@@ -66,6 +68,30 @@ class FluxViz(object):
         self.buildTargetLineGrid(lonLatPoints)
         self.buildEdgeUVGrids(bounds_lon, bounds_lat)
 
+        # create a polyline grid along the target points and place vectors on them
+        vectorPoints = []
+        for i in range(len(lonLatPoints) - 1):
+            begPoint = lonLatPoints[i]
+            endPoint = lonLatPoints[i + 1]
+            u = endPoint - begPoint
+            distance = numpy.sqrt(u.dot(u))
+            # normalize
+            u /= distance
+            nvpts = max(2, int(distance / self.dx))
+            vdx = distance / float(nvpts - 1)
+            for j in range(nvpts):
+                vectorPoints.append(begPoint + u*j*vdx)
+        self.vectorPoints = numpy.array(vectorPoints)
+
+        # compute the vector at the target line
+        self.vinterp = mint.VectorInterp()
+        self.vinterp.setGrid(self.gr.getMintGrid())
+        self.vinterp.buildLocator(numCellsPerBucket=128, periodX=360.)
+        self.vinterp.findPoints(self.vectorPoints, tol2=1.e-12)
+        vectorValues = self.vinterp.getVectors(self.integratedVelocity)
+        # need to rotate the vectors
+        zhat = numpy.array([0., 0., 1.], numpy.float64)
+        self.vectorValues = numpy.array([numpy.cross(zhat, v) for v in vectorValues])
 
     def update(self, key):
 
@@ -348,7 +374,7 @@ class FluxViz(object):
         self.cbar.SetLookupTable(self.lut)
 
         self.tubesU = vtk.vtkTubeFilter()
-        self.tubesU.SetRadius(self.dx * 0.5)
+        self.tubesU.SetRadius(self.dx * 0.1)
         self.tubesU.SetNumberOfSides(16)
         self.tubesU.SetInputData(self.gridU)
         self.mapperU = vtk.vtkPolyDataMapper()
@@ -360,7 +386,7 @@ class FluxViz(object):
         self.actorU.GetProperty().SetInterpolationToPhong()
 
         self.tubesV = vtk.vtkTubeFilter()
-        self.tubesV.SetRadius(self.dx * 0.5)
+        self.tubesV.SetRadius(self.dx * 0.1)
         self.tubesV.SetNumberOfSides(16)
         self.tubesV.SetInputData(self.gridV)
         self.mapperV = vtk.vtkPolyDataMapper()
@@ -379,18 +405,56 @@ class FluxViz(object):
         self.actorPoints = vtk.vtkActor()
         self.actorPoints.SetMapper(self.mapperPoints)
 
-        # add a cone to show the direction
-        self.cone = vtk.vtkConeSource()
-        self.cone.SetRadius(self.dx * 2.0)
-        pc = 0.1*self.lonLatPoints[-2, :] + 0.9*self.lonLatPoints[-1, :]
-        u = self.lonLatPoints[-1, :] - self.lonLatPoints[-2, :]
-        self.cone.SetCenter(pc)
-        self.cone.SetDirection(u)
-        self.cone.SetHeight(numpy.sqrt(0.05*u.dot(u)))
-        self.coneMapper = vtk.vtkPolyDataMapper()
-        self.coneMapper.SetInputConnection(self.cone.GetOutputPort())
-        self.coneActor = vtk.vtkActor()
-        self.coneActor.SetMapper(self.coneMapper)
+        # add vector plot to target line
+        nvpts = self.vectorPoints.shape[0]
+        maxVectorLength = max([numpy.sqrt(self.vectorValues[i, :].dot(self.vectorValues[i, :])) for i in range(nvpts)])
+
+        self.targetGlyphs = vtk.vtkGlyph3D()
+        self.targetVectorPointData = vtk.vtkDoubleArray()
+        self.targetVectorValues = vtk.vtkDoubleArray()
+        self.targetVectorPoints = vtk.vtkPoints()
+        self.targetVectorGrid = vtk.vtkStructuredGrid()
+        self.targetVectorMapper = vtk.vtkPolyDataMapper()
+        self.targetGlyphs = vtk.vtkGlyph3D()
+        self.targetArrow = vtk.vtkArrowSource()
+        self.targetVectorActor = vtk.vtkActor()
+
+        self.targetVectorPointData.SetNumberOfComponents(3)
+        self.targetVectorPointData.SetNumberOfTuples(nvpts)
+        self.targetVectorPointData.SetVoidArray(self.vectorPoints, nvpts*3, 1)
+        self.targetVectorPoints.SetNumberOfPoints(nvpts)
+        self.targetVectorPoints.SetData(self.targetVectorPointData)
+
+        self.targetVectorValues.SetNumberOfComponents(3)
+        self.targetVectorValues.SetNumberOfTuples(nvpts)
+        self.targetVectorValues.SetVoidArray(self.vectorValues, nvpts*3, 1)
+
+        self.targetVectorGrid.SetDimensions(nvpts, 1, 1)
+        self.targetVectorGrid.SetPoints(self.targetVectorPoints)
+        self.targetVectorGrid.GetPointData().SetVectors(self.targetVectorValues)
+
+        self.targetGlyphs.SetVectorModeToUseVector()
+        self.targetGlyphs.SetScaleModeToScaleByVector()
+        self.targetGlyphs.SetSourceConnection(self.targetArrow.GetOutputPort())
+        self.targetGlyphs.SetInputData(self.targetVectorGrid)
+        self.targetGlyphs.SetScaleFactor(5*self.dx/maxVectorLength)
+
+        self.targetVectorMapper.SetInputConnection(self.targetGlyphs.GetOutputPort())
+        self.targetVectorMapper.Update()
+        self.targetVectorActor.SetMapper(self.targetVectorMapper)
+
+        # # add a cone to show the direction
+        # self.cone = vtk.vtkConeSource()
+        # self.cone.SetRadius(self.dx * 2.0)
+        # pc = 0.1*self.lonLatPoints[-2, :] + 0.9*self.lonLatPoints[-1, :]
+        # u = self.lonLatPoints[-1, :] - self.lonLatPoints[-2, :]
+        # self.cone.SetCenter(pc)
+        # self.cone.SetDirection(u)
+        # self.cone.SetHeight(numpy.sqrt(0.05*u.dot(u)))
+        # self.coneMapper = vtk.vtkPolyDataMapper()
+        # self.coneMapper.SetInputConnection(self.cone.GetOutputPort())
+        # self.coneActor = vtk.vtkActor()
+        # self.coneActor.SetMapper(self.coneMapper)
 
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
@@ -408,7 +472,8 @@ class FluxViz(object):
         self.ren.AddActor(self.actorPoints)
         self.ren.AddActor(self.cbar)
         self.ren.AddActor(self.title)
-        self.ren.AddActor(self.coneActor)
+        self.ren.AddActor(self.targetVectorActor)
+        # self.ren.AddActor(self.coneActor)
         self.ren.SetBackground((0., 0., 0.))
         camera = self.ren.GetActiveCamera()
         lon, lat = 0.5*(self.lonmin + self.lonmax), 0.5*(self.latmin + self.latmax)
@@ -437,14 +502,22 @@ def __del__(self):
     self.ncV.close()
 
 
-def main(*, tFile: str, uFile: str, vFile: str, lonLatPointsStr: str):
+def main(*, tFile: str, uFile: str, vFile: str, lonLatPointsStr: str='', sFile: str=''):
     """Visualize fluxes
     :param tFile: netcdf file holding the T-grid
     :param uFile: netcdf file holding u data
     :param vFile: netcdf file holding v data
     :param lonLatPointsStr: target points "(lon0, lat0), (lon1, lat1),..."
+    :param sfile: alternatively read target points from this text file
     """
-    xyVals = numpy.array(eval(lonLatPointsStr))
+    if lonLatPointsStr:
+        xyVals = numpy.array(eval(lonLatPointsStr))
+    elif sFile:
+        llreader = LatLonReader(sFile)
+        xyVals = llreader.getLonLats()
+    else:
+        raise RuntimeError('ERROR must provide either sFile or lonLatPointsStr!')
+    print(f'target points:\n {xyVals}')
     numTargetPoints = xyVals.shape[0]
     lonLatZPoints = numpy.zeros((numTargetPoints, 3), numpy.float64)
     lonLatZPoints[:, :2] = xyVals

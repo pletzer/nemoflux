@@ -14,7 +14,7 @@ class LatLonReader(object):
 				m = re.match(PAT, line)
 				if m:
 					lat, lon = float(m.group(1)), float(m.group(2))
-					self.lonLatTargets.append((lon, lat, 0.0))
+					self.lonLatTargets.append((lon, lat))
 
 	def getLonLats(self):
 		return numpy.array(self.lonLatTargets)
