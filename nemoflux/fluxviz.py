@@ -133,6 +133,27 @@ class FluxViz(object):
                 camera.SetPosition(x, y, z + self.dx)
             elif key == 'Z':
                 camera.SetPosition(x, y, z - self.dx)
+            elif key == 'v':
+                self.targetGlyphs.SetScaleFactor(1.3*self.targetGlyphs.GetScaleFactor())
+            elif key == 'V':
+                self.targetGlyphs.SetScaleFactor(self.targetGlyphs.GetScaleFactor()/1.3)
+            elif key == 's':
+                # screenshot
+                w2f = vtk.vtkWindowToImageFilter()
+                w2f.Modified()
+                w2f.SetInput(self.renWin)
+                w2f.Update()
+                wr = vtk.vtkPNMWriter()
+                wr.SetInputConnection(w2f.GetOutputPort())
+                filename = f'fluxviz_{self.timeIndex:04d}.pnm'
+                wr.SetFileName(filename)
+                wr.Write()
+                print(f'saved screen shot for time {self.timeIndex} in file {filename}')
+            elif key == 'm':
+                # save all frames
+                for i in range(self.nt):
+                    self.update(key='t')
+                    self.update(key='s')
             camera.Modified()
             return
 
@@ -389,6 +410,8 @@ class FluxViz(object):
 
         self.cbar = vtk.vtkScalarBarActor()
         self.cbar.SetLookupTable(self.lut)
+        self.cbar.SetTitle('Extensive u, v')
+        self.cbar.SetBarRatio(0.08)
 
         self.tubesU = vtk.vtkTubeFilter()
         self.tubesU.SetRadius(self.dx * 0.2)
@@ -461,19 +484,7 @@ class FluxViz(object):
         self.targetVectorMapper.SetInputConnection(self.targetGlyphs.GetOutputPort())
         self.targetVectorMapper.Update()
         self.targetVectorActor.SetMapper(self.targetVectorMapper)
-
-        # # add a cone to show the direction
-        # self.cone = vtk.vtkConeSource()
-        # self.cone.SetRadius(self.dx * 2.0)
-        # pc = 0.1*self.lonLatPoints[-2, :] + 0.9*self.lonLatPoints[-1, :]
-        # u = self.lonLatPoints[-1, :] - self.lonLatPoints[-2, :]
-        # self.cone.SetCenter(pc)
-        # self.cone.SetDirection(u)
-        # self.cone.SetHeight(numpy.sqrt(0.05*u.dot(u)))
-        # self.coneMapper = vtk.vtkPolyDataMapper()
-        # self.coneMapper.SetInputConnection(self.cone.GetOutputPort())
-        # self.coneActor = vtk.vtkActor()
-        # self.coneActor.SetMapper(self.coneMapper)
+        #self.targetVectorActor.GetProperty().SetColor(0., 1., 0.) # green arrows
 
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
@@ -492,7 +503,6 @@ class FluxViz(object):
         self.ren.AddActor(self.cbar)
         self.ren.AddActor(self.title)
         self.ren.AddActor(self.targetVectorActor)
-        # self.ren.AddActor(self.coneActor)
         self.ren.SetBackground((0., 0., 0.))
         camera = self.ren.GetActiveCamera()
         lon, lat = 0.5*(self.lonmin + self.lonmax), 0.5*(self.latmin + self.latmax)
