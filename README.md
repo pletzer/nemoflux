@@ -10,7 +10,6 @@ conda create -n nemoflux python=3.8
 conda activate nemoflux
 conda install -c conda-forge python-mint>=1.14.6
 ```
-**NOTE: python-mint version 1.14.6 should become available soon**
 
 ## How to download the software
 
