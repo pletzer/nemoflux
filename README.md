@@ -34,7 +34,7 @@ should display test_T.nc, test_U.nc	and test_V.nc. test_T.nc contains the grid i
 python fluxviz.py  -t test_T.nc -u test_U.nc -v test_V.nc -l "(-129,-80),(-23,-34),(156,78)"
 ```
 
-![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/picture/simple.png?raw=true)
+![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/simple.png?raw=true)
 
 You can step in time by typing "t" in the window. Type "q" to quit/exit. Zoom in/out using the mouse/pad. To reset the view type "r".
 
@@ -52,6 +52,6 @@ where `$TFILE`, `$UFILE` and `$VFILE` are the names of the T, U, and V netCDF fi
 ```
 python fluxviz.py -t ../data/sa/T.nc -u ../data/sa/U.nc -v ../data/sa/V.nc -s ../data/sa/S3_sa.txt
 ```
-![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/picture/sa.png?raw=true)
+![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/sa.png?raw=true)
 
 Feel free to edit the target points in file ../data/sa/S3_sa.txt. 
