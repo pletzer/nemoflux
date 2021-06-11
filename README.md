@@ -22,15 +22,17 @@ cd nemoflux/nemoflux
 
 NEMO data can be quite large. The following will generate mock data that mimick NEMO's NetCDF files. The variable names and some attributes match those of a NEMO file in a minimalistic way. This is a good way to get started. 
 ```
-python datagen.py --deltaDeg="20,30" --nz=10 --nt=4 --nx=36 --ny=18 --prefix=test
+python datagen.py --deltaDeg="20,30" --nz=10 --nt=4 --nx=36 --ny=18 --prefix=test --potentialFunction="x"
 ```
 will produce three files:
 ```
 ls test_?.nc
 ```
-should display test_T.nc, test_U.nc	and test_V.nc. Here test_T.nc contains the grid information, test_U.nc and test_V.nc contain the u, v velocity components. The following command will display the total flow for the target longitude, latitude points (-129,-80),(-23,-34),(156,78):
+should display test_T.nc, test_U.nc	and test_V.nc. Here test_T.nc contains the grid information, test_U.nc and test_V.nc contain the u, v velocity components. Optiuon `--deltaDeg` specifies the amount of longitude/latitude applied to displace the poles - a convenient way to create a curvilinear grid. The vector field was generated from a potential function, which in this case varies linearly in the longitude (x).
+
+The following command will display the total flow for the target longitude, latitude points (0,-80),(-23,-34),(100,78):
 ```
-python fluxviz.py  -t test_T.nc -u test_U.nc -v test_V.nc -l "(-129,-80),(-23,-34),(156,78)"
+python fluxviz.py  -t test_T.nc -u test_U.nc -v test_V.nc -l "(0,-80),(-23,-34),(10,78)"
 ```
 
 ![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/simple.png?raw=true)
@@ -40,11 +42,13 @@ This shows a "tartan" plot where the u and v velocity fields are integrated vect
 
 ## How to subset NEMO data
 
+As mentioned previously, NEMO grids can be large and extracting a subset of the global, one that focuses on the domain of interest, makes the application more snappy. 
+
 To subset the NEMO data to a smaller domain
 ```
 python python subsetNEMO.py -t $TFILE -u $UFILE -v $VFILE --outputdir=mytest --imin=1200 --imax=1300 --jmin=500 --jmax=600
 ```
-where `$TFILE`, `$UFILE` and `$VFILE` are the names of the T, U, and V netCDF files. 
+where `$TFILE`, `$UFILE` and `$VFILE` are the names of the T, U, and V netCDF files, respectively, and `--imin`, `--imax`, `--jmin` and `--jmax` are the start/end indices in the input files. 
 
 ## How to compute the total flow across an irregular path
 
@@ -53,8 +57,4 @@ python fluxviz.py -t ../data/sa/T.nc -u ../data/sa/U.nc -v ../data/sa/V.nc -s ..
 ```
 ![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/sa.png?raw=true)
 
-Note that the flux/flow should be multiplied by the earth's radius (A = 6371000) to get m^3/s. Feel free to edit the target points in file ../data/sa/S3_sa.txt. The path can cross land but must entirely be within the domain.
-
-## Trouble shooting
-
-Most errors are due the target line (path) having points falling outside the domain. 
+Note that the flux/flow should be multiplied by the earth's radius (A = 6371000 metres) to get m^3/s. Feel free to edit the target points in file ../data/sa/S3_sa.txt. The flux crossing land is set to zero.

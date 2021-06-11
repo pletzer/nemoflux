@@ -462,7 +462,7 @@ class FluxViz(object):
         self.targetVectorPointData.SetNumberOfComponents(3)
         self.targetVectorPointData.SetNumberOfTuples(nvpts)
         # move the point a little up for visualization
-        self.vectorPoints[:, 2] = 0.01
+        self.vectorPoints[:, 2] = 0.5*self.dx
         self.targetVectorPointData.SetVoidArray(self.vectorPoints, nvpts*3, 1)
         self.targetVectorPoints.SetNumberOfPoints(nvpts)
         self.targetVectorPoints.SetData(self.targetVectorPointData)
@@ -474,6 +474,9 @@ class FluxViz(object):
         self.targetVectorGrid.SetDimensions(nvpts, 1, 1)
         self.targetVectorGrid.SetPoints(self.targetVectorPoints)
         self.targetVectorGrid.GetPointData().SetVectors(self.targetVectorValues)
+
+        self.targetArrow.SetShaftResolution(8)
+        self.targetArrow.SetTipResolution(16)
 
         self.targetGlyphs.SetVectorModeToUseVector()
         self.targetGlyphs.SetScaleModeToScaleByVector()

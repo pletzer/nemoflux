@@ -67,7 +67,7 @@ class DataGen(object):
         self.bounds_lat[..., 3] = self.yy[1:, :-1]
 
 
-    def applyPotential(self, potentialFunction):
+    def applyStreamFunction(self, streamFunction):
         zmin, zmax = self.zmin, self.zmax
         self.potential = numpy.zeros((self.nt, self.nz, self.ny, self.nx, 4), numpy.float64)
         A = geo.EARTH_RADIUS
@@ -76,7 +76,7 @@ class DataGen(object):
             for k in range(self.nz):
                 z = self.zhalf[k]
                 x, y = self.xx, self.yy
-                pot = eval(potentialFunction)
+                pot = eval(streamFunction)
                 self.potential[t, k, ..., 0] = pot[:-1, :-1]
                 self.potential[t, k, ..., 1] = pot[:-1, 1:]
                 self.potential[t, k, ..., 2] = pot[1:, 1:]
@@ -208,7 +208,7 @@ class DataGen(object):
         ncV.close()
 
 
-def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str='test', 
+def main(*, streamFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str='test', 
             xmin: float=-180., xmax: float=180., 
             ymin: float=-90., ymax: float=90.,
             zmin: float=0., zmax: float=1.0,
@@ -237,7 +237,7 @@ def main(*, potentialFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*p
     if deltaDeg[0] != 0 or deltaDeg[1] != 0:
         # the rotatePole function does not work at lon = 0 if there is no displacement
         lldg.rotatePole(deltaDeg=deltaDeg)
-    lldg.applyPotential(potentialFunction)
+    lldg.applyStreamFunction(streamFunction)
     lldg.computeUVFromPotential()
     lldg.save()
 
