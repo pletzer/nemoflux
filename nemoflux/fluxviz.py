@@ -437,7 +437,7 @@ class FluxViz(object):
 
         # target line
         self.tubePoints = vtk.vtkTubeFilter()
-        self.tubePoints.SetRadius(self.dx * 0.5)
+        self.tubePoints.SetRadius(self.dx * 0.3)
         self.tubePoints.SetNumberOfSides(16)
         self.tubePoints.SetInputData(self.gridTargetLine)
         self.mapperPoints = vtk.vtkPolyDataMapper()
