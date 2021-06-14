@@ -172,7 +172,7 @@ class FluxViz(object):
                                            for i in range(numTargetPoints)])
 
         # update the pipeline
-        self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
+        self.lut.SetTableRange(0., self.maxAbsFlux)
         self.lut.Modified()
         self.cbar.Modified()
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
@@ -362,6 +362,7 @@ class FluxViz(object):
         eU = self.edgeFluxesUArray.reshape((self.ny, self.nx))
         eV = self.edgeFluxesVArray.reshape((self.ny, self.nx))
         iV = self.integratedVelocity.reshape((self.ny, self.nx, 4))
+
         # south, (ny, nx, 4)
         iV[1:, :, 0] = eV[:-1, :] # will set self.integratedVelocity on the south side
         # west
@@ -369,9 +370,11 @@ class FluxViz(object):
         # periodic BCs
         iV[:, 0, 3] = eU[:, -1]
 
-        self.maxAbsFlux = max(self.maxAbsFlux, 
-                              numpy.fabs(self.edgeFluxesUArray.min()), numpy.fabs(self.edgeFluxesUArray.max()),
-                              numpy.fabs(self.edgeFluxesVArray.min()), numpy.fabs(self.edgeFluxesVArray.max()))
+        # from now on, edge fluxes are abs values
+        self.edgeFluxesUArray[:] = numpy.fabs(self.edgeFluxesUArray)
+        self.edgeFluxesVArray[:] = numpy.fabs(self.edgeFluxesVArray)
+
+        self.maxAbsFlux = max(self.maxAbsFlux, self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
 
 
     def show(self, npx=1260, npy=960):
@@ -380,39 +383,33 @@ class FluxViz(object):
         self.title = vtk.vtkTextActor()
         self.title.SetTextScaleMode(0)
         self.title.GetTextProperty().SetFontSize(50)
-        self.title.SetInput(f"flux = {totalFlux:10.3g}*A m^3/s @ time {self.timeIndex}")
-        self.title.SetPosition((0.6, 0.9))
+        self.title.SetInput(f"flux = {totalFlux:10.3g} (A m^2/s) @ time {self.timeIndex}")
+        self.title.SetPosition((0.6, 0.2))
 
+        # lookup table
         self.lut = vtk.vtkLookupTable()
         nc1 = 10001
         self.lut.SetNumberOfTableValues(nc1)
         for i in range(nc1):
             x = float(i)/float(nc1-1)
-            g = 0.5 + 0.5*numpy.cos(x*2*numpy.pi)
-            a = 0.2 + max(0., (1.-0.2)*numpy.cos(x*numpy.pi)**2)
-            if x < 0.499999:
-                # negative
-                r = 0.
-                b = 1.
-            elif x > 0.500001:
-                # positive
-                r = 1.
-                b = 0.
-            else:
-                # land or zero velocity
-                r = 0.8
-                g = 0.8
-                b = 0.7
-                a = 1.0
+            r = x**2
+            g = numpy.sin(numpy.pi*x/2.)**2
+            b = 0.2 + 0.8*x
+            a = 1.0
+            if x < 0.0001:
+                # land or zero flux
+                r, g, b, a = 0.4, 0.4, 0.4, 1.0
             self.lut.SetTableValue(i, r, g, b, a)
-        self.lut.SetTableRange(-self.maxAbsFlux, self.maxAbsFlux)
+        self.lut.SetTableRange(0.0, self.maxAbsFlux)
         self.lut.Build()
 
+        # colorbar
         self.cbar = vtk.vtkScalarBarActor()
         self.cbar.SetLookupTable(self.lut)
-        self.cbar.SetTitle('Extensive u, v')
+        self.cbar.SetTitle('flux [A m^2/s]')
         self.cbar.SetBarRatio(0.08)
 
+        # tubes for the u fluxes
         self.tubesU = vtk.vtkTubeFilter()
         self.tubesU.SetRadius(self.dx * 0.2)
         self.tubesU.SetNumberOfSides(16)
@@ -425,6 +422,7 @@ class FluxViz(object):
         self.actorU.SetMapper(self.mapperU)
         self.actorU.GetProperty().SetInterpolationToPhong()
 
+        # tubes for the v fluxes
         self.tubesV = vtk.vtkTubeFilter()
         self.tubesV.SetRadius(self.dx * 0.2)
         self.tubesV.SetNumberOfSides(16)
@@ -437,13 +435,16 @@ class FluxViz(object):
         self.actorV.SetMapper(self.mapperV)
         self.actorV.GetProperty().SetInterpolationToPhong()
 
+        # target line
         self.tubePoints = vtk.vtkTubeFilter()
         self.tubePoints.SetRadius(self.dx * 0.5)
+        self.tubePoints.SetNumberOfSides(16)
         self.tubePoints.SetInputData(self.gridTargetLine)
         self.mapperPoints = vtk.vtkPolyDataMapper()
         self.mapperPoints.SetInputConnection(self.tubePoints.GetOutputPort())
         self.actorPoints = vtk.vtkActor()
         self.actorPoints.SetMapper(self.mapperPoints)
+        self.actorPoints.GetProperty().SetColor(1., 0.7, 0.) # white transect
 
         # add vector plot to target line
         nvpts = self.vectorPoints.shape[0]
@@ -487,7 +488,7 @@ class FluxViz(object):
         self.targetVectorMapper.SetInputConnection(self.targetGlyphs.GetOutputPort())
         self.targetVectorMapper.Update()
         self.targetVectorActor.SetMapper(self.targetVectorMapper)
-        #self.targetVectorActor.GetProperty().SetColor(0., 1., 0.) # green arrows
+        self.targetVectorActor.GetProperty().SetColor(1., 0.7, 0.) # yellow arrows
 
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
@@ -534,21 +535,21 @@ def __del__(self):
     self.ncV.close()
 
 
-def main(*, tFile: str, uFile: str, vFile: str, lonLatPointsStr: str='', sFile: str=''):
+def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', sFile: str=''):
     """Visualize fluxes
     :param tFile: netcdf file holding the T-grid
     :param uFile: netcdf file holding u data
     :param vFile: netcdf file holding v data
-    :param lonLatPointsStr: target points "(lon0, lat0), (lon1, lat1),..."
+    :param lonLatPoints: target points "(lon0, lat0), (lon1, lat1),..."
     :param sfile: alternatively read target points from this text file
     """
-    if lonLatPointsStr:
-        xyVals = numpy.array(eval(lonLatPointsStr))
+    if lonLatPoints:
+        xyVals = numpy.array(eval(lonLatPoints))
     elif sFile:
         llreader = LatLonReader(sFile)
         xyVals = llreader.getLonLats()
     else:
-        raise RuntimeError('ERROR must provide either sFile or lonLatPointsStr!')
+        raise RuntimeError('ERROR must provide either sFile or lonLatPoints!')
     print(f'target points:\n {xyVals}')
     numTargetPoints = xyVals.shape[0]
     lonLatZPoints = numpy.zeros((numTargetPoints, 3), numpy.float64)

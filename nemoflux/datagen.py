@@ -1,6 +1,6 @@
 import netCDF4
 import numpy
-from numpy import pi, cos, sin
+from numpy import pi, cos, sin, arctan2, arctan
 import math
 import defopt
 import geo
@@ -167,7 +167,7 @@ class DataGen(object):
 
     def save(self):
 
-        ncT = netCDF4.Dataset(self.prefix + '_T.nc', 'w')
+        ncT = netCDF4.Dataset(self.prefix + 'T.nc', 'w')
         ncT.createDimension('z', self.nz)
         ncT.createDimension('y', self.ny)
         ncT.createDimension('x', self.nx)
@@ -182,7 +182,7 @@ class DataGen(object):
         bounds_lon[:] = self.bounds_lon
         ncT.close()
 
-        ncU = netCDF4.Dataset(self.prefix + '_U.nc', 'w')
+        ncU = netCDF4.Dataset(self.prefix + 'U.nc', 'w')
         ncU.createDimension('t', self.nt)
         ncU.createDimension('z', self.nz)
         ncU.createDimension('y', self.ny)
@@ -195,7 +195,7 @@ class DataGen(object):
         ncU.earthRadius = f'earth radius = {geo.EARTH_RADIUS} in metres'
         ncU.close()
 
-        ncV = netCDF4.Dataset(self.prefix + '_V.nc', 'w')
+        ncV = netCDF4.Dataset(self.prefix + 'V.nc', 'w')
         ncV.createDimension('t', self.nt)
         ncV.createDimension('z', self.nz)
         ncV.createDimension('y', self.ny)
@@ -208,7 +208,7 @@ class DataGen(object):
         ncV.close()
 
 
-def main(*, streamFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str='test', 
+def main(*, streamFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x/360))", prefix: str='', 
             xmin: float=-180., xmax: float=180., 
             ymin: float=-90., ymax: float=90.,
             zmin: float=0., zmax: float=1.0,
@@ -216,7 +216,7 @@ def main(*, streamFunction: str="(cos(t*2*pi/nt)+2)*(0.5*(y/180)**2 + sin(2*pi*x
             deltaDeg: str="(0.,0.)"):
     """Generate data
     :param potentialFunction: potential expression of x (logical lon), y (logical lat), z (depth) and t (time index)
-    :param prefix: file prefix
+    :param prefix: file prefix, data will be saved as <prefix>T.nc, <prefix>U.nc and <prefix>V.nc
     :param xmin: min longitude
     :param xmax: max longitude
     :param ymin: min latitude
