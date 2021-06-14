@@ -34,9 +34,9 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-70),(-160,-10)
 ```
 
 ![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/simple.png?raw=true)
-The above shows the grid (rectilinear), the fluxes on each grid edge as colour coded tubes and the target line over which the flux is computed. In this example, the stream function is "-x" and the velocity is a cross product of zHat times grad (-x), which gives a velocity pointing up in the y direction. (Our zHat points down as is expected for ocean depth.) The orange arrows show the flux, perpendicular to the target line. The computed flux is 360, which exactly matches the difference between the end and start longitude coordinates of the target line as we would expect for a velocity that derives from a stream function.
+The above shows the grid (rectilinear), the fluxes on each grid edge as colour coded tubes and the target line (orange) over which the flux is computed. In this example, the stream function is "-x" and the velocity is a cross product of zHat times grad (-x), which gives a velocity pointing up in the y direction. (Our zHat points down as is expected for ocean depth.) The orange arrows show the flux, perpendicular to the target line. The computed flux is 360, which exactly matches the difference between the end and start longitude coordinates of the target line, as we would expect for a velocity that derives from a stream function.
 
-## Closed contour flux calculation example
+## A closed contour flux calculation example
 
 The target line can be a closed contour, for instance
 ```
@@ -47,6 +47,7 @@ in which case the total flux must be zero. Note that the last point replicates t
 
 ## A more complex vector field
 
+Let's increae the resolution and have the stream function vary in a more interesting way
 ```
 python datagen.py --streamFunction="cos(2*pi*y/360) + sin(2*pi*x/360)" --nx=360 --ny=180
 python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-100,-80),(100,-80),(0,80),(-100,-80)"
