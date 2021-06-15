@@ -7,6 +7,9 @@ from horizgrid import HorizGrid
 import mint
 from latlonreader import LatLonReader
 
+
+EARTH_RADIUS = 6371000.0
+
 # callback class called when the user interacts with the visualization
 class CallBack(object):
 
@@ -21,7 +24,9 @@ class CallBack(object):
 
 class FluxViz(object):
 
-    def __init__(self, tFile, uFile, vFile, lonLatPoints):
+    def __init__(self, tFile, uFile, vFile, lonLatPoints, sverdrup=False):
+
+        self.sverdrup = sverdrup
 
         # read the cell bounds
         with netCDF4.Dataset(tFile) as nc:
@@ -176,13 +181,16 @@ class FluxViz(object):
         self.lut.Modified()
         self.cbar.Modified()
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
-        self.title.SetInput(f'flux = {totalFlux:6.3g}*A m^/s3 @ time {self.timeIndex}')
+        if self.sverdrup:
+            totalFlux *= EARTH_RADIUS / 1.e6
+            self.title.SetInput(f'flux = {totalFlux:6.3g} (Sv) @ time {self.timeIndex}')
+        else:
+            self.title.SetInput(f'flux = {totalFlux:6.3g} (A m^2/s) @ time {self.timeIndex}')
         self.title.Modified()
         self.edgeFluxesU.Modified()
         self.edgeFluxesV.Modified()
         self.targetVectorValues.Modified()
         print(f'time index now {self.timeIndex} max |flux|: {self.maxAbsFlux:10.3f} nt = {self.nt}')
-
 
     def getSizes(self):
         # get the sizes
@@ -199,7 +207,6 @@ class FluxViz(object):
                 except:
                     raise RuntimeError("ERROR: uo's shape does not match (t, z, y, x), (z, y, x) or (y, x)")
         return nt, nz, ny, nx
-
 
     def buildTargetLineGrid(self, lonLatPoints):
 
@@ -223,7 +230,6 @@ class FluxViz(object):
             ptIds.SetId(0, i)
             ptIds.SetId(1, i + 1)
             self.gridTargetLine.InsertNextCell(vtk.VTK_LINE, ptIds)
-
 
     def buildEdgeUVGrids(self, bounds_lon, bounds_lat):
 
@@ -307,12 +313,10 @@ class FluxViz(object):
 
         return fieldVerticallyIntegrated
 
-
     def getUV(self):
         uVerticallyIntegrated = self.readField(self.ncU, 'uo')
         vVerticallyIntegrated = self.readField(self.ncV, 'vo')
         return uVerticallyIntegrated, vVerticallyIntegrated
-
 
     def computeArcLengths(self):
 
@@ -326,7 +330,6 @@ class FluxViz(object):
         for i0 in range(4):
             i1 = (i0 + 1) % 4
             self.arcLengths[:, i0] = geo.getArcLengthArray(xyz[:, i0, :], xyz[:, i1, :], radius=geo.EARTH_RADIUS)
-
 
     def computeIntegratedFlux(self, uVerticallyIntegrated, vVerticallyIntegrated):
 
@@ -370,12 +373,16 @@ class FluxViz(object):
         # periodic BCs
         iV[:, 0, 3] = eU[:, -1]
 
+        if self.sverdrup:
+            eU *= EARTH_RADIUS / 1.e6
+            eV *= EARTH_RADIUS / 1.e6
+            iV *= EARTH_RADIUS / 1.e6
+
         # from now on, edge fluxes are abs values
         self.edgeFluxesUArray[:] = numpy.fabs(self.edgeFluxesUArray)
         self.edgeFluxesVArray[:] = numpy.fabs(self.edgeFluxesVArray)
 
         self.maxAbsFlux = max(self.maxAbsFlux, self.edgeFluxesUArray.max(), self.edgeFluxesVArray.max())
-
 
     def show(self, npx=1260, npy=960):
 
@@ -383,8 +390,11 @@ class FluxViz(object):
         self.title = vtk.vtkTextActor()
         self.title.SetTextScaleMode(0)
         self.title.GetTextProperty().SetFontSize(50)
-        self.title.SetInput(f"flux = {totalFlux:10.3g} (A m^2/s) @ time {self.timeIndex}")
-        self.title.SetPosition((0.6, 0.2))
+        if self.sverdrup:
+            totalFlux *= EARTH_RADIUS / 1.e6
+            self.title.SetInput(f"flux = {totalFlux:10.3g} (Sv) @ time {self.timeIndex}")
+        else:
+            self.title.SetInput(f"flux = {totalFlux:10.3g} (A m^2/s) @ time {self.timeIndex}")
 
         # lookup table
         self.lut = vtk.vtkLookupTable()
@@ -394,11 +404,11 @@ class FluxViz(object):
             x = float(i)/float(nc1-1)
             r = x**2
             g = numpy.sin(numpy.pi*x/2.)**2
-            b = 0.2 + 0.8*x
+            b = numpy.sqrt(x) #0.3 + 0.7*x
             a = 1.0
             if x < 0.0001:
                 # land or zero flux
-                r, g, b, a = 0.4, 0.4, 0.4, 1.0
+                r, g, b, a = 0.6, 0.55, 0.5, 1.0
             self.lut.SetTableValue(i, r, g, b, a)
         self.lut.SetTableRange(0.0, self.maxAbsFlux)
         self.lut.Build()
@@ -406,7 +416,10 @@ class FluxViz(object):
         # colorbar
         self.cbar = vtk.vtkScalarBarActor()
         self.cbar.SetLookupTable(self.lut)
-        self.cbar.SetTitle('flux [A m^2/s]')
+        if self.sverdrup:
+            self.cbar.SetTitle('flux (Sv)')
+        else:
+            self.cbar.SetTitle('flux (A m^2/s)')
         self.cbar.SetBarRatio(0.08)
 
         # tubes for the u fluxes
@@ -535,26 +548,26 @@ def __del__(self):
     self.ncV.close()
 
 
-def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', sFile: str=''):
+def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFile: str='', sverdrup: bool=False):
     """Visualize fluxes
     :param tFile: netcdf file holding the T-grid
     :param uFile: netcdf file holding u data
     :param vFile: netcdf file holding v data
     :param lonLatPoints: target points "(lon0, lat0), (lon1, lat1),..."
-    :param sfile: alternatively read target points from this text file
+    :param iFile: alternatively read target points from text file
     """
     if lonLatPoints:
         xyVals = numpy.array(eval(lonLatPoints))
-    elif sFile:
-        llreader = LatLonReader(sFile)
+    elif iFile:
+        llreader = LatLonReader(iFile)
         xyVals = llreader.getLonLats()
     else:
-        raise RuntimeError('ERROR must provide either sFile or lonLatPoints!')
+        raise RuntimeError('ERROR must provide either iFile or lonLatPoints!')
     print(f'target points:\n {xyVals}')
     numTargetPoints = xyVals.shape[0]
     lonLatZPoints = numpy.zeros((numTargetPoints, 3), numpy.float64)
     lonLatZPoints[:, :2] = xyVals
-    fv = FluxViz(tFile, uFile, vFile, lonLatZPoints)
+    fv = FluxViz(tFile, uFile, vFile, lonLatZPoints, sverdrup)
     fv.show()
 
 
