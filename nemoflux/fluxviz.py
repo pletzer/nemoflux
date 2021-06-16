@@ -52,7 +52,7 @@ class FluxViz(object):
                        counterclock=False, periodX=360.0)
 
 
-        self.thickness = -(self.bounds_depth[:, 1] - self.bounds_depth[:, 0]) # DEPTH HAS OPPOSITE SIGN TO Z
+        self.thickness = self.bounds_depth[:, 1] - self.bounds_depth[:, 0]
 
         numCells = self.ny * self.nx
         self.dx = min((self.lonmax - self.lonmin)/float(self.nx), (self.latmax - self.latmin)/float(self.ny))
@@ -95,14 +95,7 @@ class FluxViz(object):
         self.vinterp.setGrid(self.gr.getMintGrid())
         self.vinterp.buildLocator(numCellsPerBucket=128, periodX=360.)
         self.vinterp.findPoints(self.vectorPoints, tol2=1.e-12)
-        vectorValues = self.vinterp.getVectors(self.integratedVelocity)
-        # need to rotate the vectors
-        zhat = numpy.array([0., 0., 1.], numpy.float64)
-        numTargetPoints = len(vectorValues)
-        # project the vectors on the target line, then rotate using zhat x product
-        self.vectorValues = numpy.array([numpy.cross(zhat, \
-                            self.uVectors[i] * vectorValues[i, :].dot(self.uVectors[i])) \
-                            for i in range(numTargetPoints)])
+        self.vectorValues = self.vinterp.getFaceVectors(self.integratedVelocity)
 
     def update(self, key):
 
@@ -167,14 +160,7 @@ class FluxViz(object):
         # this will update self.integratedVelocity
         self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
 
-        vectorValues = self.vinterp.getVectors(self.integratedVelocity)
-        # need to rotate the vectors
-        zhat = numpy.array([0., 0., 1.], numpy.float64)
-        numTargetPoints = len(vectorValues)
-        # project the vectors on the target line, then rotate using zhat x product
-        self.vectorValues[:] = numpy.array([numpy.cross(zhat, \
-                                           self.uVectors[i] * vectorValues[i, :].dot(self.uVectors[i])) \
-                                           for i in range(numTargetPoints)])
+        self.vectorValues[:] = self.vinterp.getFaceVectors(self.integratedVelocity)
 
         # update the pipeline
         self.lut.SetTableRange(0., self.maxAbsFlux)
@@ -182,7 +168,6 @@ class FluxViz(object):
         self.cbar.Modified()
         totalFlux = self.pli.getIntegral(self.integratedVelocity)
         if self.sverdrup:
-            totalFlux *= EARTH_RADIUS / 1.e6
             self.title.SetInput(f'flux = {totalFlux:6.3g} (Sv) @ time {self.timeIndex}')
         else:
             self.title.SetInput(f'flux = {totalFlux:6.3g} (A m^2/s) @ time {self.timeIndex}')
@@ -293,23 +278,23 @@ class FluxViz(object):
                 # increment the cell counter
                 cellId += 1
 
-    def readField(self, nc, filedName):
+    def readField(self, nc, fieldName):
 
         # read u
         try:
-            field = nc.variables[filedName][self.timeIndex, :, :, :]
+            field = nc.variables[fieldName][self.timeIndex, :, :, :]
         except:
             try:
-                field = nc.variables[filedName][...]
+                field = nc.variables[fieldName][...]
             except:
-                raise RuntimeError(f'ERROR: could not read {filedName} field')
+                raise RuntimeError(f'ERROR: could not read {fieldName} field')
 
         # set to zero where missing
         field = numpy.ma.filled(field, 0.0)
 
         # integrate vertically, multiplying by the thickness of the layers
         # sum of multiplying axis 0 of thickness with axis 0 of field...
-        fieldVerticallyIntegrated = numpy.tensordot(self.thickness, field, axes=(0, 0)) 
+        fieldVerticallyIntegrated = numpy.tensordot(self.thickness, field, axes=(0, 0))
 
         return fieldVerticallyIntegrated
 
@@ -391,7 +376,6 @@ class FluxViz(object):
         self.title.SetTextScaleMode(0)
         self.title.GetTextProperty().SetFontSize(50)
         if self.sverdrup:
-            totalFlux *= EARTH_RADIUS / 1.e6
             self.title.SetInput(f"flux = {totalFlux:10.3g} (Sv) @ time {self.timeIndex}")
         else:
             self.title.SetInput(f"flux = {totalFlux:10.3g} (A m^2/s) @ time {self.timeIndex}")
@@ -404,11 +388,11 @@ class FluxViz(object):
             x = float(i)/float(nc1-1)
             r = x**2
             g = numpy.sin(numpy.pi*x/2.)**2
-            b = numpy.sqrt(x) #0.3 + 0.7*x
+            b = 0.4 + 0.6*numpy.sqrt(x)
             a = 1.0
             if x < 0.0001:
                 # land or zero flux
-                r, g, b, a = 0.6, 0.55, 0.5, 1.0
+                r, g, b, a = 0.8, 0.75, 0.7, 1.0
             self.lut.SetTableValue(i, r, g, b, a)
         self.lut.SetTableRange(0.0, self.maxAbsFlux)
         self.lut.Build()
