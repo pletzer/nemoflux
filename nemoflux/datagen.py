@@ -22,7 +22,7 @@ class DataGen(object):
         self.zmax = zmax
 
     def setSizes(self, nx, ny, nz, nt):
-        # number of cells in x, y, z + number of time steps
+        # number of cells in x, y, z, time
         self.nx = nx
         self.ny = ny
         self.nz = nz
@@ -33,15 +33,11 @@ class DataGen(object):
         self.buildUniformHorizontal()
 
     def buildVertical(self):
-        #  non-uniform depth
-        # self.zhalf = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0.5)/float(self.nz))**2 for k in range(self.nz)])
-        # self.ztop  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 0  )/float(self.nz))**2 for k in range(self.nz)])
-        # self.zbot  = numpy.array([self.zmin + (self.zmax - self.zmin)*((k + 1  )/float(self.nz))**2 for k in range(self.nz)])
         dz = (self.zmax - self.zmin)/float(self.nz)
         print(f'zmin/zmax = {self.zmin}/{self.zmax}')
         self.zhalf = numpy.array([self.zmin + (k + 0.5)*dz for k in range(self.nz)])
-        self.ztop  = numpy.array([self.zmin + (k + 0  )*dz for k in range(self.nz)])
-        self.zbot  = numpy.array([self.zmin + (k + 1  )*dz for k in range(self.nz)])
+        self.ztop  = numpy.array([self.zmin + (k + 1  )*dz for k in range(self.nz)])
+        self.zbot  = numpy.array([self.zmin + (k + 2  )*dz for k in range(self.nz)])
 
     def buildUniformHorizontal(self):
 
@@ -49,8 +45,8 @@ class DataGen(object):
         dy, dx = (self.ymax - self.ymin)/float(self.ny), (self.xmax - self.xmin)/float(self.nx)
 
         # xx and yy are the lon and lats
-        x = numpy.array([self.xmin + i*dx for i in range(self.nx + 1)])
-        y = numpy.array([self.ymin + j*dx for j in range(self.ny + 1)])
+        x = numpy.array([self.xmin + i*dx for i in range(nx1)])
+        y = numpy.array([self.ymin + j*dx for j in range(ny1)])
         self.xx, self.yy = numpy.meshgrid(x, y, indexing='xy')
 
         # cell bounds
@@ -58,12 +54,15 @@ class DataGen(object):
         self.bounds_lat = numpy.zeros((self.ny, self.nx, 4), numpy.float64)
 
         self.bounds_lon[..., 0] = self.xx[:-1, :-1]
-        self.bounds_lon[..., 1] = self.xx[:-1, 1:]
-        self.bounds_lon[..., 2] = self.xx[1:, 1:]
-        self.bounds_lon[..., 3] = self.xx[1:, :-1]
         self.bounds_lat[..., 0] = self.yy[:-1, :-1]
+
+        self.bounds_lon[..., 1] = self.xx[:-1, 1:]
         self.bounds_lat[..., 1] = self.yy[:-1, 1:]
+
+        self.bounds_lon[..., 2] = self.xx[1:, 1:]
         self.bounds_lat[..., 2] = self.yy[1:, 1:]
+
+        self.bounds_lon[..., 3] = self.xx[1:, :-1]
         self.bounds_lat[..., 3] = self.yy[1:, :-1]
 
 
