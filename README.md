@@ -9,7 +9,7 @@ You'll need the python `mint` package to be installed. This is most easily done 
 ```
 conda create -n nemoflux python=3.8
 conda activate nemoflux
-conda install -c conda-forge python-mint>=1.14.6
+conda install -c conda-forge python-mint>=1.15.2
 ```
 
 ## How to download the software
@@ -23,7 +23,7 @@ cd nemoflux/nemoflux
 
 NEMO data can be quite large. The following will generate mock data that mimic NEMO's NetCDF files. The variable names and some attributes match those of a NEMO file but in a minimalist way. This is a good way to get started. 
 ```
-python datagen.py --streamFunction="-x"
+python datagen.py --streamFunction="x"
 ```
 will produce three files:
 ```
@@ -49,6 +49,7 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-100,-80),(100,-80),
 in which case the total flux must be zero. Note the last point which replicates the starting point.
 
 ![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/closed.png?raw=true)
+
 
 ## A more complex vector field
 
@@ -96,13 +97,13 @@ python python subsetNEMO.py -t $TFILE -u $UFILE -v $VFILE --outputdir=mytest --i
 ```
 where `$TFILE`, `$UFILE` and `$VFILE` are the names of the T, U, and V netCDF files, respectively, and `--imin`, `--imax`, `--jmin` and `--jmax` are the start/end indices in the input files. This will generate the NetCDF files `fluxviz.py` needs. 
 ```
-python fluxviz.py -t ../data/sa/T.nc -u ../data/sa/U.nc -v ../data/sa/V.nc -s ../data/sa/S3_sa.txt
+python fluxviz.py -t ../data/sa/T.nc -u ../data/sa/U.nc -v ../data/sa/V.nc -s -i ../data/sa/S3_sa.txt
 ```
 ![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/sa.png?raw=true)
 
-Note that the flux/flow should be multiplied by the earth's radius (A = 6371000 metres) to get a mass flow in m^3/s. To create a movie type "m" in the window - this will create PNM files for each frame. You create an MPEG movie form the frames with the command
+Note option "-s" which computes the mass flow in Sverdrup (1 Sv = 1.e6 m^3/s). To create a movie type "m" in the window - this will create PNM files for each frame. You create an MPEG movie form the frames with the command
 ```
-convert -delay 20 fluxviz*.pnm fluxviz.mpg
+convert -quality 100 -delay 20 fluxviz*.pnm fluxviz.mpg
 ```
 assuming you have ImageMagick installed.
 
