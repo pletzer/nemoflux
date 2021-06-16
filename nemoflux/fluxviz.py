@@ -387,12 +387,12 @@ class FluxViz(object):
         for i in range(nc1):
             x = float(i)/float(nc1-1)
             r = x**2
-            g = numpy.sin(numpy.pi*x/2.)**2
-            b = 0.4 + 0.6*numpy.sqrt(x)
+            g = numpy.sin(numpy.pi*x)
+            b = 0.6 + 0.4*numpy.sqrt(x)
             a = 1.0
             if x < 0.0001:
                 # land or zero flux
-                r, g, b, a = 0.8, 0.75, 0.7, 1.0
+                r, g, b, a = 1.0, 0.95, 0.9, 1.0
             self.lut.SetTableValue(i, r, g, b, a)
         self.lut.SetTableRange(0.0, self.maxAbsFlux)
         self.lut.Build()
