@@ -9,7 +9,7 @@ You'll need the python `mint` package to be installed. This is most easily done 
 ```
 conda create -n nemoflux python=3.8
 conda activate nemoflux
-conda install -c conda-forge python-mint>=1.15.2
+conda install -c conda-forge python-mint>=1.15.4
 ```
 
 ## How to download the software
