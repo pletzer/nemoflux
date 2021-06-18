@@ -36,19 +36,27 @@ The following command will display the total flow for specified target longitude
 python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-70),(-160,-10),(-35,40),(20,-50),(60,50),(180,40)"
 ```
 
-![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/simple.png?raw=true)
+![alt simple flux](https://github.com/pletzer/nemoflux/blob/main/pictures/simple.png?raw=true)
 
-The plot shows the grid (rectilinear), colour coded fluxes on each grid edge and the target line (orange) over which the flux is computed. In this example, the stream function is "-x" and the velocity is a cross product of zHat times grad (-x), which gives a velocity pointing up in the y direction. (Our zHat points down as is expected for ocean depth.) The orange arrows show the flux, perpendicular to the target line. The computed flux is 360, which exactly matches the difference between the end and start longitude coordinates of the target line, expected for a velocity that derives from a stream function.
+The plot shows the rectilinear grid (rectilinear). The edges of each cell are colour coded by the amount of flux. The velocity field is grad(x) x zHat where zHat points out of the screen. With our choice of stream function, the velocity is uniform and points down in the y direction.  
 
-## A closed contour flux calculation example
+The orange line is the "target" representing the surface extruded in the z direction for which the flux (velocity times area) is computed. For this simple stream function model the total flux is just the difference between the end and start point of the stream function, in our case 360. (If the grid is on the sphere then the units are earth radius A times m^2/s).
 
-The target line can be a closed contour, for instance
+The velocity on the target line is shown as a set of arrows.
+
+## A singular example
+
+The code is able to recover the exact flux when target line starts and ends at grid nodes, regardless of the intermediate points. This is also true when the 
+field is singular. To generate a singular field, set the stream function to be proportional to the angle around the singularity
+
 ```
-python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-100,-80),(100,-80),(0,80),(-100,-80)"
+python datagen.py --streamFunction="arctan2(y, x+180)/(2*pi)"
+python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-80), (-10, -80),(-10,80), (-180, 80)"
 ```
-in which case the total flux must be zero. Note the last point which replicates the starting point.
 
-![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/closed.png?raw=true)
+![alt singular flux](https://github.com/pletzer/nemoflux/blob/main/pictures/singular.png?raw=true)
+
+The end/start difference of the stream function is 0.5 in this case.
 
 
 ## A more complex vector field
@@ -73,7 +81,7 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-100,-80),(100,-80),
 ```
 You can zoom and rotate with the mouse. Type "r" to reset the view, "y"/"Y" to move the camera up and down or "x"/"X" to move the camera to the left/right. 
 
-![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/rotatedPole.png?raw=true)
+![rotated pole](https://github.com/pletzer/nemoflux/blob/main/pictures/rotatedPole.png?raw=true)
 
 ## Adding elevation and depth
 
@@ -99,7 +107,7 @@ where `$TFILE`, `$UFILE` and `$VFILE` are the names of the T, U, and V netCDF fi
 ```
 python fluxviz.py -t ../data/sa/T.nc -u ../data/sa/U.nc -v ../data/sa/V.nc -s -i ../data/sa/S3_sa.txt
 ```
-![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/sa.png?raw=true)
+![south africa](https://github.com/pletzer/nemoflux/blob/main/pictures/sa.png?raw=true)
 
 Note option "-s" which computes the mass flow in Sverdrup (1 Sv = 1.e6 m^3/s). To create a movie type "m" in the window - this will create PNM files for each frame. You create an MPEG movie form the frames with the command
 ```
