@@ -1,7 +1,7 @@
 # nemoflux
 
 This repository contains scripts that show how to compute the lateral water flow across longitude-latitude. The data are assumed to be stored in 
-NetCDF format. The variable names have been hardwired to match those ocean NEMO simulations.
+NetCDF format. The variable names have been hardwired to match those of ocean NEMO simulations.
 
 ## Prerequisites
 
@@ -40,14 +40,16 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-70),(-160,-10)
 
 The plot shows the rectilinear grid (rectilinear). The edges of each cell are colour coded by the amount of flux. The velocity field is grad(x) x zHat where zHat points out of the screen. With our choice of stream function, the velocity is uniform and points down in the y direction.  
 
-The orange line is the "target" representing the surface extruded in the z direction for which the flux (velocity times area) is computed. For this simple stream function model the total flux is just the difference between the end and start point of the stream function, in our case 360. (If the grid is on the sphere then the units are earth radius A times m^2/s).
+The orange line is the "target" representing the surface extruded in the z direction for which the flux (velocity times area) is computed. For this simple stream function model the total flux is just the difference between the end and start points of the stream function, in our case 360. (If the grid is on the sphere then the units are earth radius A times m^2/s).
 
 The velocity on the target line is shown as a set of arrows.
 
 ## A singular example
 
-The code is able to recover the exact flux when target line starts and ends at grid nodes, regardless of the intermediate points. This is also true when the 
-field is singular. To generate a singular field, set the stream function to be proportional to the angle around the singularity
+The code is able to recover the exact flux when target line starts and ends at grid nodes, regardless of the intermediate target points. This is also true when the 
+field is singular. 
+
+To generate a singular field, set the stream function to be proportional to the angle around the singularity
 
 ```
 python datagen.py --streamFunction="arctan2(y, x+180)/(2*pi)"
@@ -92,7 +94,7 @@ python datagen.py --streamFunction="(1+10*z)*(t+1)*(cos(2*pi*y/360) + sin(2*pi*x
 python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-100,-80),(100,-80),(0,80)"
 ```
 
-This shows a "tartan" plot where the u and v velocity fields are integrated vertically across the "z" layers and along the T cell edges. The arrows represent the velocity field that is perpendicular to the lateral surface. You can step in time by typing "t" in the window. Type "q" to quit/exit. Zoom in/out using the mouse/pad. To reset the view type "r".
+This will show a "tartan" plot where the u and v velocity fields are integrated vertically across the "z" layers and along the T cell edges. The arrows represent the velocity field that is perpendicular to the lateral surface. You can step in time by typing "t" in the window. Type "q" to quit/exit. Zoom in/out using the mouse/pad. To reset the view type "r".
 
 
 ## Computing fluxes from NEMO data
@@ -115,4 +117,4 @@ convert -quality 100 -delay 20 fluxviz*.pnm fluxviz.mpg
 ```
 assuming you have ImageMagick installed.
 
-Feel free to edit the target points in file ../data/sa/S3_sa.txt. The flux crossing land is set to zero.
+Feel free to edit the target points in file ../data/sa/S3_sa.txt. When the target points intersect land, the flux will be set to zero.
