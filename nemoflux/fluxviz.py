@@ -319,7 +319,6 @@ class FluxViz(object):
     def computeIntegratedFlux(self, uVerticallyIntegrated, vVerticallyIntegrated):
 
         numCells = self.ny * self.nx
-
         #        ^
         #        |
         #  3-----V-----2
@@ -328,8 +327,9 @@ class FluxViz(object):
         #  |           |
         #  0-----------1
 
-        self.edgeFluxesUArray[:] = uVerticallyIntegrated.reshape((numCells,)) * self.arcLengths[:, 1]
-        self.edgeFluxesVArray[:] = vVerticallyIntegrated.reshape((numCells,)) * self.arcLengths[:, 2]
+        # cross product means that the flux in V points to the negative y
+        self.edgeFluxesUArray[:] = + uVerticallyIntegrated.reshape((numCells,)) * self.arcLengths[:, 1]
+        self.edgeFluxesVArray[:] = - vVerticallyIntegrated.reshape((numCells,)) * self.arcLengths[:, 2]
 
         #        2
         #        ^
@@ -363,7 +363,7 @@ class FluxViz(object):
             eV *= EARTH_RADIUS / 1.e6
             iV *= EARTH_RADIUS / 1.e6
 
-        # from now on, edge fluxes are abs values
+        # from now on, edge fluxes are abs values!
         self.edgeFluxesUArray[:] = numpy.fabs(self.edgeFluxesUArray)
         self.edgeFluxesVArray[:] = numpy.fabs(self.edgeFluxesVArray)
 

@@ -106,10 +106,11 @@ class DataGen(object):
             for k in range(self.nz):
                 dPhi21 = self.potential[t, k, ..., 2] - self.potential[t, k, ..., 1]
                 dPhi23 = self.potential[t, k, ..., 2] - self.potential[t, k, ..., 3]
-                # east, - d phi/ d xi_2, xi_2 is the parametric coord 2, divide by ds to get vector component
-                self.u[t, k, ...] = - dPhi21 / ds21
-                # north, + d phi/ d xi_1, xi_1 is the parametric coord 1
-                self.v[t, k, ...] = + dPhi23 / ds23
+                # east, d phi/ d eta, divide by ds to get vector component
+                self.u[t, k, ...] = dPhi21 / ds21
+                # north, d phi/ d xi, divide by ds to get vector component. Note that 
+                # the surface element ds x dz points down, hence negative sign
+                self.v[t, k, ...] = -dPhi23 / ds23
 
 
     def rotatePole(self, deltaDeg=(0., 0.)):
