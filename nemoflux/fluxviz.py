@@ -195,7 +195,7 @@ class FluxViz(object):
         if self.field.sverdrup:
             self.title.SetInput(f"flux = {totalFlux:10.3g} (Sv) @ time {self.field.timeIndex}")
         else:
-            self.title.SetInput(f"flux = {totalFlux:10.3g} (A m^2/s) @ time {self.field.s}")
+            self.title.SetInput(f"flux = {totalFlux:10.3g} (A m^2/s) @ time {self.field}")
 
         # lookup table
         self.lut = vtk.vtkLookupTable()
