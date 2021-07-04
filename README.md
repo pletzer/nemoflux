@@ -38,7 +38,7 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-70),(-160,-10)
 
 ![alt simple flux](https://github.com/pletzer/nemoflux/blob/main/pictures/simple.png?raw=true)
 
-The plot shows the rectilinear grid (rectilinear). The edges of each cell are colour coded by the amount of flux. The velocity field is grad(x) x zHat where zHat points out of the screen. With our choice of stream function, the velocity is uniform and points down in the y direction.  
+The plot shows the rectilinear grid. The edges of each cell are colour coded by the amount of flux. The velocity field is grad(x) x zHat where zHat points out of the screen. With our choice of stream function, the velocity is uniform and points down in the y direction.  
 
 The orange line is the "target" representing the surface extruded in the z direction for which the flux (velocity times area) is computed. For this simple stream function model the total flux is just the difference between the end and start points of the stream function, in our case 360. (If the grid is on the sphere then the units are earth radius A times m^2/s).
 
@@ -46,8 +46,7 @@ The velocity on the target line is shown as a set of arrows.
 
 ## A singular example
 
-The code is able to recover the exact flux when target line starts and ends at grid nodes, regardless of the intermediate target points. This is also true when the 
-field is singular. 
+The code is able to recover the exact flux when the target line starts and ends at grid nodes, regardless of the intermediate target points. This is also true when the field is singular. 
 
 To generate a singular field, set the stream function to be proportional to the angle around the singularity
 
@@ -58,7 +57,9 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-80), (-10, -80
 
 ![alt singular flux](https://github.com/pletzer/nemoflux/blob/main/pictures/singular.png?raw=true)
 
-The end/start difference of the stream function is 0.5 in this case.
+The end/start difference of the stream function is 0.5 in this case. The exact value is the difference of angle (in radiants) from the lower, start point to the upper, terminal point (`pi`) divided by `2*pi`. 
+
+This flow integral is independent of the path of the target line. Numerically, you should get the exact value if the starting and end points fall on mesh nodes that are at least one cell away from the singularity.
 
 
 ## A more complex vector field
