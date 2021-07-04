@@ -69,7 +69,7 @@ Let's increase the resolution and have the stream function vary in a more intere
 python datagen.py --streamFunction="cos(2*pi*y/360) + sin(2*pi*x/360)" --nx=360 --ny=180
 python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-100,-80),(100,-80),(0,80),(-100,-80)"
 ```
-Type "v" in the visualisation window to increase the vector arrow size (or "V" to decrease). The total flux for the closed loop is, to within machine accuracy, zero.
+Type "v" in the visualisation window to increase the vector arrow size (or "V" to decrease). The total flux for the closed loop is, to within machine accuracy, zero. This is expected whenever the velocity field derives from a stream function.
 
 ![alt total flow at time 0](https://github.com/pletzer/nemoflux/blob/main/pictures/closed2.png?raw=true)
 
