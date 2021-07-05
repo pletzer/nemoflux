@@ -25,13 +25,9 @@ NEMO data can be quite large. The following will generate mock data that mimic N
 ```
 python datagen.py --streamFunction="x"
 ```
-will produce three files:
-```
-ls ?.nc
-```
-should display T.nc, U.nc and V.nc. Here T.nc contains the grid information (the lon-lat bounds). Files U.nc and V.nc contain the u, v velocity components, respectively. 
+will produce three files: T.nc, U.nc and V.nc. Here T.nc contains the grid information (the lon-lat bounds). Files U.nc and V.nc contain the u, v velocity components, respectively. 
 
-The following command will display the total flow for specified target longitude-latitude points:
+The following command will display the total flow for a set of target longitude-latitude points:
 ```
 python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-70),(-160,-10),(-35,40),(20,-50),(60,50),(180,40)"
 ```
@@ -40,7 +36,7 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-70),(-160,-10)
 
 The plot shows the rectilinear grid. The edges of each cell are colour coded by the amount of flux. The velocity field is grad(x) x zHat where zHat points out of the screen. With our choice of stream function, the velocity is uniform and points down in the y direction.  
 
-The orange line is the "target" representing the surface extruded in the z direction for which the flux (velocity times area) is computed. For this simple stream function model the total flux is just the difference between the end and start points of the stream function, in our case 360. (If the grid is on the sphere then the units are earth radius A times m^2/s).
+The orange line is the "target" representing the surface extruded in the z direction for which the flux (velocity times area) is computed. For this simple stream function model the total flux is just the difference between the end and start points of the stream function, in our case 360. (If the grid is on the sphere then the units are earth radius `A` times m^2/s).
 
 The velocity on the target line is shown as a set of arrows.
 
@@ -57,9 +53,9 @@ python fluxviz.py  -t T.nc -u U.nc -v V.nc --lonLatPoints="(-180,-80), (-10, -80
 
 ![alt singular flux](https://github.com/pletzer/nemoflux/blob/main/pictures/singular.png?raw=true)
 
-The end/start difference of the stream function is 0.5 in this case. The exact value is the difference of angle (in radiants) from the lower, start point to the upper, terminal point (`pi`) divided by `2*pi`. 
+The difference of the stream function taken between the end and the starting points is 0.5, that is the angle difference (`pi`) divided by the normalization factor `2*pi` used in the stream function. 
 
-This flow integral is independent of the path of the target line. Numerically, you should get the exact value if the starting and end points fall on mesh nodes that are at least one cell away from the singularity.
+This flow integral is independent of the path of the target line. Numerically, you should get the exact value if the starting and end points fall on mesh nodes that are at least one cell away from the singularity. Try it!
 
 
 ## A more complex vector field
@@ -104,7 +100,8 @@ As mentioned previously, NEMO grids can be large and extracting a subset of the 
 
 To subset the NEMO data to a smaller domain, type
 ```
-python python subsetNEMO.py -t $TFILE -u $UFILE -v $VFILE --outputdir=mytest --imin=1200 --imax=1300 --jmin=500 --jmax=600
+python python subsetNEMO.py -t $TFILE -u $UFILE -v $VFILE --outputdir=mytest \
+                            --imin=1200 --imax=1300 --jmin=500 --jmax=600
 ```
 where `$TFILE`, `$UFILE` and `$VFILE` are the names of the T, U, and V netCDF files, respectively, and `--imin`, `--imax`, `--jmin` and `--jmax` are the start/end indices in the input files. This will generate the NetCDF files `fluxviz.py` needs. 
 ```
@@ -118,4 +115,4 @@ convert -quality 100 -delay 20 fluxviz*.pnm fluxviz.mpg
 ```
 assuming you have ImageMagick installed.
 
-Feel free to edit the target points in file ../data/sa/S3_sa.txt. When the target points intersect land, the flux will be set to zero.
+Feel free to edit the target points in file ../data/sa/S3_sa.txt. Note that the target line can intersect land - this will just set the flux to be zero there.
