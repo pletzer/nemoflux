@@ -1,7 +1,7 @@
 # nemoflux
 
-This repository contains scripts that show how to compute the lateral water flow across arbitrary longitude-latitudei lines. The data are assumed to be stored in 
-NetCDF format. The variable names have been hardwired to match those of ocean NEMO simulations.
+This repository contains scripts that show how to compute the lateral water flow across arbitrary transects. The data are assumed to be stored in 
+the NetCDF format. The variable names have been hardwired to match those of ocean NEMO simulations.
 
 ## Prerequisites
 
