@@ -1,5 +1,4 @@
 import vtk
-import netCDF4
 import geo
 import defopt
 import numpy
@@ -8,6 +7,7 @@ import mint
 # to read the target points from file
 from latlonreader import LatLonReader
 from field import Field
+import re
 
 
 # callback class called when the user interacts with the visualization
@@ -24,10 +24,10 @@ class CallBack(object):
 
 class FluxViz(object):
 
-    def __init__(self, tFile, uFile, vFile, lonLatPoints, sverdrup=False):
+    def __init__(self, tFile, uFile, vFile, lonLatZPoints, sverdrup=False):
 
-        self.field = Field(tFile, uFile, vFile, lonLatPoints, sverdrup)
-        self.buildTargetLineGrid(lonLatPoints)
+        self.field = Field(tFile, uFile, vFile, lonLatZPoints, sverdrup)
+        self.buildTargetLineGrid(lonLatZPoints)
         self.buildEdgeUVGrids()
 
     def update(self, key):
@@ -91,44 +91,51 @@ class FluxViz(object):
 
         # update the data
         self.field.update()
+        nvpts = self.field.vectorPoints.shape[0]
+        maxVectorLength = max([numpy.sqrt(self.field.vectorValues[i, :].dot(self.field.vectorValues[i, :])) for i in range(nvpts)])
+        self.field.vectorValues /= maxVectorLength
 
         # update the pipeline
         self.lut.SetTableRange(0., self.field.maxAbsFlux)
         self.lut.Modified()
         self.cbar.Modified()
-        totalFlux = self.field.pli.getIntegral(self.field.integratedVelocity)
-        if self.field.sverdrup:
-            self.title.SetInput(f'flux = {totalFlux:6.3g} (Sv) @ time {self.field.timeIndex}')
-        else:
-            self.title.SetInput(f'flux = {totalFlux:6.3g} (A m^2/s) @ time {self.field.timeIndex}')
+        self.title.SetInput(f'flux = {self.field.getFluxText()} {self.field.timeObj.getTimeAsString(self.field.timeIndex)}')
         self.title.Modified()
         self.edgeFluxesU.Modified()
         self.edgeFluxesV.Modified()
         self.targetVectorValues.Modified()
         print(f'time index now {self.field.timeIndex} max |flux|: {self.field.maxAbsFlux:10.3f} nt = {self.field.nt}')
 
-    def buildTargetLineGrid(self, lonLatPoints):
+    def buildTargetLineGrid(self, lonLatZPoints):
 
         ptIds = vtk.vtkIdList()
         ptIds.SetNumberOfIds(2)
 
         # build the target point mesh
-        self.lonLatPoints = lonLatPoints
-        numTargetPoints = lonLatPoints.shape[0]
         self.targetPointData = vtk.vtkDoubleArray()
         self.targetPointData.SetNumberOfComponents(3)
-        self.targetPointData.SetNumberOfTuples(numTargetPoints)
-        self.targetPointData.SetVoidArray(self.lonLatPoints, numTargetPoints*3, 1)
+        self.gridTargetLine = vtk.vtkPolyData()
+        self.gridTargetLine.Allocate()
+        ptId = 0
+        for segment in lonLatZPoints:
+            numPoints = len(segment)
+            assert(numPoints >= 2)
+            for i0 in range(numPoints - 1):
+                p0 = segment[i0]
+                self.targetPointData.InsertNextTuple(p0)
+                ptIds.SetId(0, ptId)
+                ptIds.SetId(1, ptId + 1)
+                self.gridTargetLine.InsertNextCell(vtk.VTK_LINE, ptIds)
+                ptId += 1
+            # add last point
+            p0 = segment[numPoints - 1]
+            self.targetPointData.InsertNextTuple(p0)
+            ptId += 1
+
         self.targetPoints = vtk.vtkPoints()
         self.targetPoints.SetData(self.targetPointData)
-        self.gridTargetLine = vtk.vtkPolyData()
         self.gridTargetLine.SetPoints(self.targetPoints)
-        self.gridTargetLine.Allocate()
-        assert(numTargetPoints > 1)
-        for i in range(numTargetPoints - 1):
-            ptIds.SetId(0, i)
-            ptIds.SetId(1, i + 1)
-            self.gridTargetLine.InsertNextCell(vtk.VTK_LINE, ptIds)
+
 
     def buildEdgeUVGrids(self):
 
@@ -188,24 +195,22 @@ class FluxViz(object):
 
     def show(self, npx=1260, npy=960):
 
-        totalFlux = self.field.pli.getIntegral(self.field.integratedVelocity)
-        self.title = vtk.vtkTextActor()
-        self.title.SetTextScaleMode(0)
-        self.title.GetTextProperty().SetFontSize(50)
-        if self.field.sverdrup:
-            self.title.SetInput(f"flux = {totalFlux:10.3g} (Sv) @ time {self.field.timeIndex}")
-        else:
-            self.title.SetInput(f"flux = {totalFlux:10.3g} (A m^2/s) @ time {self.field}")
+        np = max(npx, npy)
 
-        # lookup table
+        self.title = vtk.vtkTextActor()
+        self.title.SetTextScaleMode(1)
+        self.title.GetTextProperty().SetFontSize(int(0.12*np))
+        self.title.SetInput(f"flux = {self.field.getFluxText()} {self.field.timeObj.getTimeAsString(self.field.timeIndex)}")
+
+        # water lookup table
         self.lut = vtk.vtkLookupTable()
         nc1 = 10001
         self.lut.SetNumberOfTableValues(nc1)
         for i in range(nc1):
-            x = float(i)/float(nc1-1)
-            r = numpy.sqrt(x) # x**2
-            g = numpy.sin(numpy.pi*x)
-            b = 0.6 + 0.4*numpy.sqrt(x)
+            x = (float(i)/float(nc1-1))**0.5
+            r = 0.9*numpy.sqrt(x) # x**2
+            g = 0.9*numpy.sqrt(x) # numpy.sin(numpy.pi*x)
+            b = numpy.sqrt(x) #0.6 + 0.4*numpy.sqrt(x)
             a = 1.0
             if x < 0.0001:
                 # land or zero flux
@@ -216,12 +221,16 @@ class FluxViz(object):
 
         # colorbar
         self.cbar = vtk.vtkScalarBarActor()
+        self.cbar.UnconstrainedFontSizeOn()
+        self.cbar.GetLabelTextProperty().SetFontSize(int(0.05*np))
+        self.cbar.GetTitleTextProperty().SetFontSize(int(0.08*np))
         self.cbar.SetLookupTable(self.lut)
         if self.field.sverdrup:
             self.cbar.SetTitle('flux (Sv)')
         else:
             self.cbar.SetTitle('flux (A m^2/s)')
         self.cbar.SetBarRatio(0.08)
+        self.cbar.Modified()
 
         # tubes for the u fluxes
         self.tubesU = vtk.vtkTubeFilter()
@@ -258,22 +267,26 @@ class FluxViz(object):
         self.mapperPoints.SetInputConnection(self.tubePoints.GetOutputPort())
         self.actorPoints = vtk.vtkActor()
         self.actorPoints.SetMapper(self.mapperPoints)
-        self.actorPoints.GetProperty().SetColor(1., 0.7, 0.) # white transect
+        self.actorPoints.GetProperty().SetColor(0.2, 0.2, 1.0) # transect's color
 
         # add vector plot to target line
         nvpts = self.field.vectorPoints.shape[0]
         maxVectorLength = max([numpy.sqrt(self.field.vectorValues[i, :].dot(self.field.vectorValues[i, :])) for i in range(nvpts)])
+        self.field.vectorValues /= maxVectorLength
 
+        self.targetArrow = vtk.vtkArrowSource()
         self.targetGlyphs = vtk.vtkGlyph3D()
         self.targetVectorPointData = vtk.vtkDoubleArray()
         self.targetVectorValues = vtk.vtkDoubleArray()
         self.targetVectorPoints = vtk.vtkPoints()
         self.targetVectorGrid = vtk.vtkStructuredGrid()
         self.targetVectorMapper = vtk.vtkPolyDataMapper()
-        self.targetGlyphs = vtk.vtkGlyph3D()
-        self.targetArrow = vtk.vtkArrowSource()
         self.targetVectorActor = vtk.vtkActor()
 
+        self.targetArrow.SetShaftResolution(8)
+        self.targetArrow.SetTipResolution(16)
+        self.targetGlyphs.SetScaleModeToScaleByVector()
+        self.targetGlyphs.SetColorModeToColorByVector()
         self.targetVectorPointData.SetNumberOfComponents(3)
         self.targetVectorPointData.SetNumberOfTuples(nvpts)
         # move the point a little up for visualization
@@ -290,19 +303,21 @@ class FluxViz(object):
         self.targetVectorGrid.SetPoints(self.targetVectorPoints)
         self.targetVectorGrid.GetPointData().SetVectors(self.targetVectorValues)
 
-        self.targetArrow.SetShaftResolution(8)
-        self.targetArrow.SetTipResolution(16)
-
+        self.targetGlyphs.SetInputData(self.targetVectorGrid)
         self.targetGlyphs.SetVectorModeToUseVector()
         self.targetGlyphs.SetScaleModeToScaleByVector()
         self.targetGlyphs.SetSourceConnection(self.targetArrow.GetOutputPort())
-        self.targetGlyphs.SetInputData(self.targetVectorGrid)
-        self.targetGlyphs.SetScaleFactor(5*self.field.dx/maxVectorLength)
+        self.targetGlyphs.SetScaleFactor(5*self.field.dx)
+        self.targetGlyphs.Update()
 
         self.targetVectorMapper.SetInputConnection(self.targetGlyphs.GetOutputPort())
-        self.targetVectorMapper.Update()
+        self.targetVectorMapper.CreateDefaultLookupTable()
+        self.targetVectorMapper.GetLookupTable().SetHueRange(0.667, 0.)
+        self.targetVectorMapper.GetLookupTable().SetTableRange(0., 1.0)
+        self.targetVectorMapper.GetLookupTable().SetVectorModeToMagnitude()
+        self.targetVectorMapper.GetLookupTable().SetVectorSize(2)
+
         self.targetVectorActor.SetMapper(self.targetVectorMapper)
-        self.targetVectorActor.GetProperty().SetColor(1., 0.7, 0.) # yellow arrows
 
         # Create the graphics structure. The renderer renders into the render
         # window. The render window interactor captures mouse events and will
@@ -349,26 +364,33 @@ def __del__(self):
     self.ncV.close()
 
 
-def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFile: str='', sverdrup: bool=False):
+def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: str='', sverdrup: bool=False):
     """Visualize fluxes
     :param tFile: netcdf file holding the T-grid
     :param uFile: netcdf file holding u data
     :param vFile: netcdf file holding v data
-    :param lonLatPoints: target points "(lon0, lat0), (lon1, lat1),..."
-    :param iFile: alternatively read target points from text file
+    :param lonLatPoints: target points "[(lon0, lat0), (lon1, lat1),...],[...]"
+    :param iFiles: alternatively read target points from text files "['file1', 'file2',...]"
     :param sverdrup: whether or not to use Sverdrup units (default is A m^2/s)
     """
     if lonLatPoints:
-        xyVals = numpy.array(eval(lonLatPoints))
-    elif iFile:
-        llreader = LatLonReader(iFile)
-        xyVals = llreader.getLonLats()
+        lonLatZPoints = [numpy.array([(ll[0], ll[1], 0.0) for ll in llp]) for llp in eval(lonLatPoints)] 
+    elif iFiles:
+        lonLatZPoints = []
+        listOfFiles = []
+        try:
+            listOfFiles = eval(iFiles)
+            nFiles = len(listOfFiles)
+        except:
+            # single target line file?
+            listOfFiles.append(iFiles)
+        print(f'list of target surfaces: {listOfFiles}')
+        for iFile in listOfFiles:
+            llreader = LatLonReader(iFile)
+            lonLatZPoints.append([(ll[0], ll[1], 0.) for ll in llreader.getLonLats()])
     else:
-        raise RuntimeError('ERROR must provide either iFile or lonLatPoints!')
-    print(f'target points:\n {xyVals}')
-    numTargetPoints = xyVals.shape[0]
-    lonLatZPoints = numpy.zeros((numTargetPoints, 3), numpy.float64)
-    lonLatZPoints[:, :2] = xyVals
+        raise RuntimeError('ERROR must provide either iFiles (-i) or lonLatPoints (-l)!')
+    print(f'target points:\n {lonLatZPoints}')
     fv = FluxViz(tFile, uFile, vFile, lonLatZPoints, sverdrup)
     fv.show()
 

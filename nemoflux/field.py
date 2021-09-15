@@ -1,27 +1,28 @@
-import netCDF4
+import xarray
 import geo
 import defopt
 import numpy
+import re
 from horizgrid import HorizGrid
 import mint
 # to read the target points from file
 from latlonreader import LatLonReader
-
+import timeobj
 
 EARTH_RADIUS = 6371000.0
 
 
 class Field(object):
 
-    def __init__(self, tFile, uFile, vFile, lonLatPoints, sverdrup=False):
+    def __init__(self, tFile, uFile, vFile, lonLatZPoints, sverdrup=False):
 
         self.sverdrup = sverdrup
 
         # read the cell bounds
-        with netCDF4.Dataset(tFile) as nc:
-            bounds_lat = nc.variables['bounds_lat'][:]
-            bounds_lon = nc.variables['bounds_lon'][:]
-            self.bounds_depth = nc.variables['deptht_bounds'][:]
+        with xarray.open_dataset(tFile) as nc:
+            bounds_lat = nc['bounds_lat'][:]
+            bounds_lon = nc['bounds_lon'][:]
+            self.bounds_depth = nc['deptht_bounds'][:]
 
         self.lonmin = bounds_lon.min()
         self.lonmax = bounds_lon.max()
@@ -30,16 +31,21 @@ class Field(object):
         print(f'lon-lat box: {self.lonmin}, {self.latmin} -> {self.lonmax}, {self.latmax}')
 
         self.timeIndex = 0
-        self.ncU = netCDF4.Dataset(uFile)
-        self.ncV = netCDF4.Dataset(vFile)
+        self.ncU = xarray.open_dataset(uFile)
+        self.ncV = xarray.open_dataset(vFile)
+
+        # read the time values
+        self.timeObj = timeobj.TimeObj(self.ncU)
 
         self.nt, self.nz, self.ny, self.nx = self.getSizes()
 
         self.gr = HorizGrid(tFile)
-        self.pli = mint.PolylineIntegral()
-        self.pli.build(self.gr.getMintGrid(), lonLatPoints,
-                       counterclock=False, periodX=360.0)
-
+        self.plis = []
+        for lonlatpts in lonLatZPoints:
+            pli = mint.PolylineIntegral()
+            pli.build(self.gr.getMintGrid(), numpy.array(lonlatpts),
+                      counterclock=False, periodX=360.0)
+            self.plis.append(pli)
 
         self.thickness = self.bounds_depth[:, 1] - self.bounds_depth[:, 0]
 
@@ -64,19 +70,20 @@ class Field(object):
         # create a polyline grid along the target points and place vectors on them
         vectorPoints = []
         self.uVectors = []
-        for i in range(len(lonLatPoints) - 1):
-            begPoint = lonLatPoints[i]
-            endPoint = lonLatPoints[i + 1]
-            u = endPoint - begPoint
-            distance = numpy.sqrt(u.dot(u))
-            # normalize
-            u /= distance
-            nvpts = max(2, int(distance / self.dx))
-            vdx = distance / float(nvpts - 1)
-            for j in range(nvpts):
-                vectorPoints.append(begPoint + u*j*vdx)
-                self.uVectors.append(u)
-        self.vectorPoints = numpy.array(vectorPoints)
+        for lonlatpts in lonLatZPoints:
+            for i in range(len(lonlatpts) - 1):
+                begPoint = numpy.array(lonlatpts[i])
+                endPoint = numpy.array(lonlatpts[i + 1])
+                u = endPoint - begPoint
+                distance = numpy.sqrt(u.dot(u))
+                # normalize
+                u /= distance
+                nvpts = max(2, int(distance / self.dx))
+                vdx = distance / float(nvpts - 1)
+                for j in range(nvpts):
+                    vectorPoints.append(begPoint + u*j*vdx)
+                    self.uVectors.append(u)
+            self.vectorPoints = numpy.array(vectorPoints)
 
         # compute the vector at the target line
         self.vinterp = mint.VectorInterp()
@@ -84,6 +91,20 @@ class Field(object):
         self.vinterp.buildLocator(numCellsPerBucket=128, periodX=360.)
         self.vinterp.findPoints(self.vectorPoints, tol2=1.e-12)
         self.vectorValues = self.vinterp.getFaceVectors(self.integratedVelocity)
+
+
+    def getFluxText(self):
+
+        txt = ""
+        for pli in self.plis:
+            txt += f"{pli.getIntegral(self.integratedVelocity):4.3g}, "
+        if self.sverdrup:
+            txt += "(Sv) "
+        else:
+            txt += "(A m^2/s) "
+        txt = re.sub(r',\s*\(', ' (', txt)
+        return txt
+
 
     def update(self):
 
@@ -97,7 +118,7 @@ class Field(object):
     def getSizes(self):
         # get the sizes
         nt, nz, ny, nx = 1, 1, 0, 0
-        shapeU = self.ncU.variables['uo'].shape
+        shapeU = self.ncU['uo'].shape
         try:
             nt, nz, ny, nx = shapeU
         except:
@@ -119,17 +140,17 @@ class Field(object):
 
     def readField(self, nc, fieldName):
 
-        # read u
+        # read fieldName
         try:
-            field = nc.variables[fieldName][self.timeIndex, :, :, :]
+            field = nc[fieldName][self.timeIndex, :, :, :]
         except:
             try:
-                field = nc.variables[fieldName][...]
+                field = nc[fieldName][...]
             except:
                 raise RuntimeError(f'ERROR: could not read {fieldName} field')
 
         # set to zero where missing
-        field = numpy.ma.filled(field, 0.0)
+        field = field.fillna(0.0)
 
         # integrate vertically, multiplying by the thickness of the layers,
         # this is the sum of multiplying axis 0 of thickness with axis 0 of field...

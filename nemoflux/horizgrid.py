@@ -1,5 +1,5 @@
+import xarray
 import mint
-import netCDF4
 import numpy
 import defopt
 import re
@@ -9,7 +9,7 @@ class HorizGrid(object):
 
     def __init__(self, tFile):
     
-        with netCDF4.Dataset(tFile) as nc:
+        with xarray.open_dataset(tFile) as nc:
             # read the cell bounds
             bounds_lat = nc.variables['bounds_lat'][:]
             bounds_lon = nc.variables['bounds_lon'][:]

@@ -1,7 +1,12 @@
 import netCDF4
 import defopt
+import sys
+import datetime
 
-def main(*, tfile: str='', ufile: str='', vfile: str='', outputdir: str='', jmin: int, jmax: int, imin: int, imax: int):
+def main(*, tfile: str='', 
+	        ufile: str='',
+	        vfile: str='', 
+	        outputdir: str='./', jmin: int, jmax: int, imin: int, imax: int):
     """
     subset nemo data
     :param tfile: name of the netCDF file containing T cell grid data
@@ -15,8 +20,11 @@ def main(*, tfile: str='', ufile: str='', vfile: str='', outputdir: str='', jmin
     """
 
     # T file
+    print(f'T file: {tfile}')
     nci = netCDF4.Dataset(tfile)
     nco = netCDF4.Dataset(f'{outputdir}/T.nc', 'w')
+    nco.command = sys.argv
+    nco.timestamp = f'generated on {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
 
     for d in nci.dimensions:
         print(f'creating dimension {d}')
@@ -50,6 +58,8 @@ def main(*, tfile: str='', ufile: str='', vfile: str='', outputdir: str='', jmin
     for field in 'U', 'V':
         nci = netCDF4.Dataset(filenameMap[field])
         nco = netCDF4.Dataset(f'{outputdir}/{field}.nc', 'w')
+        nco.command = sys.argv
+        nco.timestamp = f'generated on {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
 
         for d in nci.dimensions:
             print(f'creating dimension {d}')
