@@ -8,6 +8,7 @@ import mint
 from latlonreader import LatLonReader
 from field import Field
 import re
+import glob
 
 
 # callback class called when the user interacts with the visualization
@@ -380,10 +381,13 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
         listOfFiles = []
         try:
             listOfFiles = eval(iFiles)
-            nFiles = len(listOfFiles)
+            _ = len(listOfFiles)
         except:
-            # single target line file?
-            listOfFiles.append(iFiles)
+            try:
+                listOfFiles = glob.glob(iFiles)
+            except:
+                # single target line file?
+                listOfFiles.append(iFiles)
         print(f'list of target surfaces: {listOfFiles}')
         for iFile in listOfFiles:
             llreader = LatLonReader(iFile)

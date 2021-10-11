@@ -2,7 +2,7 @@ import re
 import sys
 import numpy
 
-PAT = re.compile(r'^\s*\d+\s+\d+\.\d+\s+(\-?\d+\.\d+)\s+(\-?\d+\.\d+)')
+PAT = re.compile(r'^\s*\d+\s+\d+\.\d+\s+(\-?\d+\.?\d*)\s+(\-?\d+\.?\d*)')
 class LatLonReader(object):
 
 	def __init__(self, filename):
