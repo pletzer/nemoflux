@@ -90,7 +90,8 @@ class Field(object):
         self.vinterp.setGrid(self.gr.getMintGrid())
         self.vinterp.buildLocator(numCellsPerBucket=128, periodX=360.)
         self.vinterp.findPoints(self.vectorPoints, tol2=1.e-12)
-        self.vectorValues = self.vinterp.getFaceVectors(self.integratedVelocity)
+        self.vectorValues = self.vinterp.getFaceVectors(
+               self.integratedVelocity, placement=0)
 
 
     def getFluxText(self):
@@ -113,7 +114,8 @@ class Field(object):
         # this will update self.integratedVelocity
         self.computeIntegratedFlux(uVerticallyIntegrated, vVerticallyIntegrated)
 
-        self.vectorValues[:] = self.vinterp.getFaceVectors(self.integratedVelocity)
+        self.vectorValues[:] = self.vinterp.getFaceVectors(
+               self.integratedVelocity, placement=0)
 
     def getSizes(self):
         # get the sizes
