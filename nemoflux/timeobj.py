@@ -1,4 +1,5 @@
 import xarray
+from datetime import datetime
 
 class TimeObj(object):
 
@@ -18,6 +19,13 @@ class TimeObj(object):
 
     def getSize(self):
         return len(self.timeVar)
+
+
+    def getTimeAsDate(self, timeIndex):
+        year = self.timeVar.values[timeIndex].year
+        month = self.timeVar.values[timeIndex].month
+        day = self.timeVar.values[timeIndex].day
+        return datetime(year=year, month=month, day=day).date()
 
 
     def getTimeAsString(self, timeIndex):
