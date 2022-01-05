@@ -63,7 +63,8 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
         plt.plot(timeVals, values, lineTypes[count])
         lgds.append(str(targetLine))
         count = (count + 1) % len(lineTypes)
-    plt.legend(lgds)
+    if len(lgds) > 1:
+        plt.legend(lgds)
     plt.title('Water flow')
     plt.xlabel('month-year')
     if sverdrup:

@@ -268,7 +268,7 @@ class FluxViz(object):
         self.mapperPoints.SetInputConnection(self.tubePoints.GetOutputPort())
         self.actorPoints = vtk.vtkActor()
         self.actorPoints.SetMapper(self.mapperPoints)
-        self.actorPoints.GetProperty().SetColor(0.2, 0.2, 1.0) # transect's color
+        self.actorPoints.GetProperty().SetColor(1.0, 1.0, 0.1) # transect's color
 
         # add vector plot to target line
         nvpts = self.field.vectorPoints.shape[0]
