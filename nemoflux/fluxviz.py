@@ -334,7 +334,7 @@ class FluxViz(object):
         self.ren.AddActor(self.actorU)
         self.ren.AddActor(self.actorV)
         self.ren.AddActor(self.actorPoints)
-        self.ren.AddActor(self.cbar)
+        #self.ren.AddActor(self.cbar)
         self.ren.AddActor(self.title)
         self.ren.AddActor(self.targetVectorActor)
         self.ren.SetBackground((0., 0., 0.))
