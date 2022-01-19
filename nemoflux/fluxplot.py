@@ -58,11 +58,9 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
     plt.gcf().autofmt_xdate()
     lineTypes = ['b-', 'm--', 'c-.', 'r:', 'g-', 'k--']
     lgds = []
-    count = 0
-    for targetLine, values in results.items():
-        plt.plot(timeVals, values, lineTypes[count])
-        lgds.append(str(targetLine))
-        count = (count + 1) % len(lineTypes)
+    for lineIndex, values in results.items():
+        plt.plot(timeVals, values, lineTypes[lineIndex % len(lineTypes)])
+        lgds.append(str(lineIndex))
     if len(lgds) > 1:
         plt.legend(lgds)
     plt.title('Water flow')
