@@ -10,7 +10,9 @@ from latlonreader import LatLonReader
 from field import Field
 import re
 import glob
-
+import os.path
+import matplotlib
+matplotlib.rcParams.update({'font.size': 20})
 
 def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: str='', sverdrup: bool=False):
     """Visualize fluxes
@@ -27,10 +29,10 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
         lonLatZPoints = []
         listOfFiles = []
         try:
-            listOfFiles = eval(iFiles)
-            _ = len(listOfFiles)
+=            listOfFiles = eval(iFiles)
         except:
             try:
+                # can return in any order
                 listOfFiles = glob.glob(iFiles)
             except:
                 # single target line file?
@@ -60,7 +62,7 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
     lgds = []
     for lineIndex, values in results.items():
         plt.plot(timeVals, values, lineTypes[lineIndex % len(lineTypes)])
-        lgds.append(str(lineIndex))
+        lgds.append(os.path.basename(listOfFiles[lineIndex]))
     if len(lgds) > 1:
         plt.legend(lgds)
     plt.title('Water flow')

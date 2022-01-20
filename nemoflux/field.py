@@ -41,11 +41,11 @@ class Field(object):
 
         self.gr = HorizGrid(tFile)
         self.plis = []
-        for lonlatpts in lonLatZPoints:
+        for i in range(len(lonLatZPoints)):
             pli = mint.PolylineIntegral()
             pli.setGrid(self.gr.getMintGrid())
             pli.buildLocator(numCellsPerBucket=128, periodX=360., enableFolding=False)
-            pli.computeWeights(numpy.array(lonlatpts), counterclock=False)
+            pli.computeWeights(numpy.array(lonLatZPoints[i]), counterclock=False)
             self.plis.append(pli)
 
         self.thickness = self.bounds_depth[:, 1] - self.bounds_depth[:, 0]

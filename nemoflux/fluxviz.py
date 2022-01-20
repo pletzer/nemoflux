@@ -381,7 +381,6 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
         listOfFiles = []
         try:
             listOfFiles = eval(iFiles)
-            _ = len(listOfFiles)
         except:
             try:
                 listOfFiles = glob.glob(iFiles)
