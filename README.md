@@ -9,7 +9,7 @@ You'll need the python `mint` package to be installed. This is most easily done 
 ```
 conda create -n nemoflux
 conda activate nemoflux
-conda install -c conda-forge python-mint>=1.24.4 xarray defopt
+conda install -c conda-forge python-mint>=1.24.4 xarray defopt matplotlib
 ```
 
 ## How to download the software
