@@ -99,7 +99,8 @@ class Field(object):
 
         txt = ""
         for pli in self.plis:
-            txt += f"{pli.getIntegral(self.integratedVelocity):4.3g}, "
+            totalFlux = pli.getIntegral(self.integratedVelocity, mint.CELL_BY_CELL_DATA)
+            txt += f"{totalFlux:4.3g}, "
         if self.sverdrup:
             txt += "(Sv) "
         else:

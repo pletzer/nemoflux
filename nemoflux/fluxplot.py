@@ -1,3 +1,4 @@
+from functools import total_ordering
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import geo
@@ -29,7 +30,7 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
         lonLatZPoints = []
         listOfFiles = []
         try:
-=            listOfFiles = eval(iFiles)
+            listOfFiles = eval(iFiles)
         except:
             try:
                 # can return in any order
@@ -52,7 +53,8 @@ def main(*, tFile: str, uFile: str, vFile: str, lonLatPoints: str='', iFiles: st
         timeVals.append(fld.timeObj.getTimeAsDate(itime))
         lineIndex = 0
         for pli in fld.plis:
-            results[lineIndex] = results.get(lineIndex, []) + [pli.getIntegral(fld.integratedVelocity)]
+            totalFlux = pli.getIntegral(fld.integratedVelocity, mint.CELL_BY_CELL_DATA)
+            results[lineIndex] = results.get(lineIndex, []) + [totalFlux]
             lineIndex += 1
         fld.timeIndex += 1
     # plotting
