@@ -7,9 +7,9 @@ the NetCDF format. The variable names have been hardwired to match those of ocea
 
 You'll need the python `mint` package to be installed. This is most easily done on Linux/Mac OSX with the following commands:
 ```
-conda create -n nemoflux python=3.8
+conda create -n nemoflux
 conda activate nemoflux
-conda install -c conda-forge python-mint>=1.15.4
+conda install -c conda-forge python-mint>=1.24.4 xarray defopt matplotlib
 ```
 
 ## How to download the software
